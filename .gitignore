@@ -1,0 +1,44 @@
+# Environment variables
+.env
+*.env
+
+# Temporary files
+.tmp/
+*.tmp
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Database
+*.db
+*.sqlite
+
+# Prerequisites prompt files (keep locally, don't commit)
+PROMPT_*.md
+
+# Master methodology file (keep locally, don't commit)
+CLAUDE.md
+AGENTS.md
+GEMINI.md
