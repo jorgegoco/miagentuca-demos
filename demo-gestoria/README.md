@@ -50,9 +50,9 @@ python orchestration/classify_endpoint.py
 ```
 
 The API will be available at:
-- **API**: http://localhost:8001
-- **Docs**: http://localhost:8001/docs
-- **Health**: http://localhost:8001/health
+- **API**: https://gestoria.miagentuca.es
+- **Docs**: https://gestoria.miagentuca.es/docs
+- **Health**: https://gestoria.miagentuca.es/health
 
 ## API Usage
 
