@@ -11,7 +11,7 @@ import sys
 import json
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -160,15 +160,10 @@ async def root():
 
 @app.post("/search", response_model=PurchaseResponse)
 @limiter.limit(f"{rate_limit}/minute")
-async def search_suppliers(request: PurchaseRequest, req=None):
+async def search_suppliers(body: PurchaseRequest, request: Request):
     """
     Search suppliers for a product and get purchase recommendations.
     """
-    from starlette.requests import Request
-    if req is None:
-        from starlette.datastructures import Headers
-        req = Request(scope={"type": "http", "headers": Headers().raw})
-
     if not anthropic_client:
         raise HTTPException(
             status_code=503,
@@ -178,9 +173,9 @@ async def search_suppliers(request: PurchaseRequest, req=None):
     try:
         # Build prompt
         prompt = SUPPLIER_SEARCH_PROMPT.format(
-            product=request.product,
-            quantity=request.quantity,
-            urgency=request.urgency
+            product=body.product,
+            quantity=body.quantity,
+            urgency=body.urgency
         )
 
         # Call Claude API
@@ -206,7 +201,7 @@ async def search_suppliers(request: PurchaseRequest, req=None):
         # Calculate total prices for each supplier
         suppliers = []
         for s in supplier_data.get("suppliers", []):
-            total = round(s["unit_price"] * request.quantity + s["shipping_cost"], 2)
+            total = round(s["unit_price"] * body.quantity + s["shipping_cost"], 2)
             suppliers.append({
                 "name": s["name"],
                 "unit_price": s["unit_price"],
@@ -226,9 +221,9 @@ async def search_suppliers(request: PurchaseRequest, req=None):
         return PurchaseResponse(
             success=True,
             product_parsed=supplier_data.get("product_parsed", {
-                "name": request.product,
+                "name": body.product,
                 "specifications": "",
-                "quantity": request.quantity
+                "quantity": body.quantity
             }),
             suppliers=suppliers,
             recommendations=Recommendations(**recommendations),
@@ -238,7 +233,7 @@ async def search_suppliers(request: PurchaseRequest, req=None):
     except json.JSONDecodeError as e:
         return PurchaseResponse(
             success=False,
-            product_parsed={"name": request.product, "specifications": "", "quantity": request.quantity},
+            product_parsed={"name": body.product, "specifications": "", "quantity": body.quantity},
             suppliers=[],
             recommendations=Recommendations(
                 best_price=None,
