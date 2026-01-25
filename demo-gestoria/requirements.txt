@@ -4,7 +4,7 @@ uvicorn[standard]==0.27.0
 python-multipart==0.0.6
 
 # AI APIs
-anthropic==0.18.1
+anthropic>=0.50.0
 openai==1.12.0
 
 # PDF processing
