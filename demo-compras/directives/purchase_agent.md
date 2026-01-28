@@ -18,13 +18,17 @@ Extract from user input:
 - Any brand preferences
 
 ### Step 2: Search Suppliers
-Use AI to simulate supplier search with realistic Spanish suppliers:
-- Würth España
-- Bricomart
-- Leroy Merlin Pro
-- Rexel
-- Saltoki
-- Local distributors
+Use AI to simulate supplier search. Suppliers must be:
+- Real Spanish companies appropriate for the product category
+- Category-specific (don't use electrical distributors for construction materials)
+
+Supplier pools by category:
+- Tornillería/fijaciones: Würth España, Bricomart, Leroy Merlin Pro, Saltoki, Coferdroza
+- Herramientas eléctricas: Würth España, Leroy Merlin Pro, Bricomart, Saltoki, Makita España
+- Material eléctrico: Rexel, Saltoki, Grupo Electro Stocks, Sonepar, Leroy Merlin Pro
+- Construcción/albañilería: Bricomart, BigMat, Leroy Merlin Pro, Punto de la Construcción, Cemex
+- Fontanería: Saltoki, Salvador Escoda, Leroy Merlin Pro, Bricomart, Roca
+- Pintura: Bricomart, Leroy Merlin Pro, AkzoNobel, Pinturas Isaval, Jotun
 
 ### Step 3: Compare Options
 For each supplier, evaluate:
@@ -81,11 +85,14 @@ Ask for clarification or make reasonable assumptions, noting them in response.
 ### Very large quantities
 Flag that bulk/wholesale pricing may apply and recommend direct contact.
 
+## Price Accuracy
+The system prompt includes reference price ranges for common product categories (screws, power tools, cables, construction, plumbing, paint). Claude must generate prices WITHIN these ranges. This was added to fix unrealistic pricing issues discovered during testing.
+
 ## Spanish Context
-- All prices in EUR
-- Suppliers are Spanish/European
+- All prices in EUR, sin IVA
+- Suppliers are real Spanish/European companies matched to product category
 - Product names may be in Spanish
-- IVA (21%) should be noted if included/excluded
+- Shipping costs must be coherent with total order weight
 
 ## Rate Limiting
 - 5 requests per minute per IP

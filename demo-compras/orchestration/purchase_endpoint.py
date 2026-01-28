@@ -91,35 +91,79 @@ class PurchaseResponse(BaseModel):
     error: Optional[str] = None
 
 
-SUPPLIER_SEARCH_PROMPT = """Eres un agente de compras para una ferretería española.
-El usuario busca: "{product}" (cantidad: {quantity})
+SUPPLIER_SEARCH_SYSTEM = """Eres un agente de compras experto para ferreterías y suministros industriales en España.
+Tu trabajo es generar datos de proveedores con precios REALISTAS del mercado español actual.
+
+REGLAS DE PRECIOS - Usa estas referencias reales del mercado español (sin IVA):
+
+TORNILLERÍA Y FIJACIONES:
+- Tornillos acero inoxidable: 0.03-0.25€/ud según tamaño (M4: ~0.03€, M6: ~0.08€, M8: ~0.12€, M10: ~0.20€)
+- Tornillos acero zincado: 40-60% más baratos que inox
+- Tacos + tornillos: 0.05-0.30€/ud
+- Clavos: 0.01-0.05€/ud
+- Arandelas: 0.01-0.08€/ud
+
+HERRAMIENTAS ELÉCTRICAS:
+- Taladro percutor básico: 50-80€
+- Taladro percutor profesional (Bosch, Makita, DeWalt): 80-200€
+- Amoladora 125mm: 40-120€
+- Sierra circular: 100-300€
+- Atornillador batería: 60-250€
+
+MATERIAL ELÉCTRICO:
+- Cable H07V-K 1.5mm² 100m: 25-40€
+- Cable H07V-K 2.5mm² 100m: 35-55€
+- Cable H07V-K 4mm² 100m: 55-85€
+- Cable H07V-K 6mm² 100m: 80-120€
+- Mecanismos (enchufes, interruptores): 2-15€/ud
+
+CONSTRUCCIÓN:
+- Cemento portland 25kg: 4.50-7.00€/saco
+- Mortero 25kg: 2.50-5.00€/saco
+- Yeso 20kg: 3.00-5.50€/saco
+- Ladrillo hueco: 0.15-0.40€/ud
+
+FONTANERÍA:
+- Tubo PVC 110mm 3m: 8-15€
+- Tubo multicapa 20mm: 1.50-3.00€/m
+- Grifería básica: 25-60€
+- Grifería media: 60-150€
+
+PINTURA:
+- Pintura plástica interior 15L: 30-70€
+- Esmalte sintético 750ml: 8-18€
+- Imprimación 4L: 15-30€
+
+ENVÍO en España peninsular:
+- Paquetería pequeña (<5kg): 4-8€
+- Paquetería media (5-30kg): 8-15€
+- Palé / mercancía pesada: 25-60€
+- Envío gratis: solo en pedidos grandes (>200-500€ según proveedor)
+
+IMPORTANTE: Los precios deben estar DENTRO de estos rangos. Si el producto no aparece en la lista, extrapola a partir de productos similares."""
+
+SUPPLIER_SEARCH_PROMPT = """El usuario busca: "{product}" (cantidad: {quantity})
 Urgencia: {urgency}
 
-Genera datos REALISTAS de 4-5 proveedores españoles. Usa proveedores reales como:
-- Würth España
-- Bricomart
-- Leroy Merlin Pro
-- Rexel
-- Saltoki
-- Suministros industriales locales
-
-Para cada proveedor, proporciona datos realistas de:
-- Precio unitario (en EUR, sin IVA)
-- Días de entrega
-- Pedido mínimo
-- Coste de envío
-- Disponibilidad en stock
+Genera datos de 4-5 proveedores españoles REALES que vendan este tipo de producto.
+Elige proveedores apropiados para la categoría del producto:
+- Tornillería/fijaciones: Würth España, Bricomart, Leroy Merlin Pro, Saltoki, Coferdroza
+- Herramientas eléctricas: Würth España, Leroy Merlin Pro, Bricomart, Saltoki, Makita España
+- Material eléctrico: Rexel, Saltoki, Grupo Electro Stocks, Sonepar, Leroy Merlin Pro
+- Construcción/albañilería: Bricomart, BigMat, Leroy Merlin Pro, Punto de la Construcción, Cemex
+- Fontanería: Saltoki, Salvador Escoda, Leroy Merlin Pro, Bricomart, Roca
+- Pintura: Bricomart, Leroy Merlin Pro, AkzoNobel, Pinturas Isaval, Jotun
 
 Responde SOLO con JSON válido en este formato exacto:
 {{
   "product_parsed": {{
-    "name": "nombre del producto",
-    "specifications": "especificaciones técnicas",
+    "name": "nombre del producto normalizado",
+    "specifications": "especificaciones técnicas concretas (medidas, material, norma DIN/ISO si aplica)",
     "quantity": {quantity}
   }},
   "suppliers": [
     {{
-      "name": "Nombre Proveedor",
+      "name": "Nombre Proveedor Real",
       "unit_price": 0.00,
       "delivery_days": 0,
       "min_order": 0,
@@ -129,8 +173,12 @@ Responde SOLO con JSON válido en este formato exacto:
   ]
 }}
 
-Asegúrate de que los precios sean realistas para el mercado español.
-Al menos un proveedor debe tener stock agotado (in_stock: false) para demostrar variedad."""
+RECUERDA:
+- Precios sin IVA, en EUR, DENTRO de los rangos de referencia
+- Coste de envío coherente con el peso total del pedido
+- Pedido mínimo realista (1 para herramientas, 10-100 para tornillería)
+- Al menos un proveedor debe tener stock agotado (in_stock: false)
+- Varía los días de entrega entre 1 y 7 días"""
 
 
 @app.get("/health")
@@ -181,7 +229,8 @@ async def search_suppliers(body: PurchaseRequest, request: Request):
         # Call Claude API
         message = anthropic_client.messages.create(
             model="claude-sonnet-4-20250514",
-            max_tokens=1500,
+            max_tokens=2000,
+            system=SUPPLIER_SEARCH_SYSTEM,
             messages=[
                 {"role": "user", "content": prompt}
             ]
