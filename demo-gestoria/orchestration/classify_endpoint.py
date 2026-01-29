@@ -16,7 +16,6 @@ from fastapi import FastAPI, File, UploadFile, HTTPException, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from pydantic import BaseModel
 from dotenv import load_dotenv
@@ -36,17 +35,37 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Configure CORS
+# CORS configuration - restrict to actual domains
+ALLOWED_ORIGINS = [
+    "https://miagentuca.es",
+    "https://www.miagentuca.es",
+    "https://gestoria.miagentuca.es",
+    "http://localhost:3000",
+    "http://localhost:5173",
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Configure rate limiting
-limiter = Limiter(key_func=get_remote_address)
+
+def get_real_ip(request: Request) -> str:
+    """Extract real client IP behind reverse proxy (Traefik/Nginx)."""
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    real_ip = request.headers.get("X-Real-IP")
+    if real_ip:
+        return real_ip
+    return request.client.host if request.client else "127.0.0.1"
+
+
+# Rate limiting - proxy-aware with daily cap
+RATE_LIMIT = os.getenv("RATE_LIMIT", "3/minute;20/day")
+limiter = Limiter(key_func=get_real_ip)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
@@ -60,7 +79,6 @@ anthropic_client = anthropic.Anthropic(api_key=anthropic_api_key) if anthropic_a
 
 # Configuration
 MAX_FILE_SIZE_MB = int(os.getenv("MAX_FILE_SIZE_MB", 2))
-MAX_REQUESTS_PER_MINUTE = os.getenv("MAX_REQUESTS_PER_MINUTE", "5/minute")
 
 
 class ClassificationResponse(BaseModel):
@@ -94,12 +112,12 @@ async def health_check():
         "status": "healthy",
         "anthropic_configured": anthropic_client is not None,
         "max_file_size_mb": MAX_FILE_SIZE_MB,
-        "rate_limit": MAX_REQUESTS_PER_MINUTE
+        "rate_limit": RATE_LIMIT
     }
 
 
 @app.post("/classify", response_model=ClassificationResponse)
-@limiter.limit(MAX_REQUESTS_PER_MINUTE)
+@limiter.limit(RATE_LIMIT)
 async def classify_document(request: Request, file: UploadFile = File(...)):
     """
     Classify an uploaded PDF document and extract relevant information.
@@ -275,7 +293,7 @@ if __name__ == "__main__":
     print(f"\n🚀 Starting Demo Gestoría - Document Classifier")
     print(f"   URL: http://{host}:{port}")
     print(f"   Docs: http://{host}:{port}/docs")
-    print(f"   Rate limit: {MAX_REQUESTS_PER_MINUTE}")
+    print(f"   Rate limit: {RATE_LIMIT}")
     print(f"   Max file size: {MAX_FILE_SIZE_MB}MB\n")
 
     uvicorn.run(

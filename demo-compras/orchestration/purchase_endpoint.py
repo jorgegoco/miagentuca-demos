@@ -15,7 +15,6 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from dotenv import load_dotenv
 import anthropic
@@ -29,7 +28,17 @@ load_dotenv()
 
 # Configuration
 anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
-rate_limit = os.getenv("MAX_REQUESTS_PER_MINUTE", "5")
+
+
+def get_real_ip(request: Request) -> str:
+    """Extract real client IP behind reverse proxy (Traefik/Nginx)."""
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    real_ip = request.headers.get("X-Real-IP")
+    if real_ip:
+        return real_ip
+    return request.client.host if request.client else "127.0.0.1"
 
 # Initialize FastAPI
 app = FastAPI(
@@ -38,17 +47,25 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# CORS configuration
+# CORS configuration - restrict to actual domains
+ALLOWED_ORIGINS = [
+    "https://miagentuca.es",
+    "https://www.miagentuca.es",
+    "https://compras.miagentuca.es",
+    "http://localhost:3000",
+    "http://localhost:5173",
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Rate limiting
-limiter = Limiter(key_func=get_remote_address)
+# Rate limiting - proxy-aware with daily cap
+RATE_LIMIT = os.getenv("RATE_LIMIT", "3/minute;20/day")
+limiter = Limiter(key_func=get_real_ip)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
@@ -259,7 +276,7 @@ async def health_check():
         "status": "healthy",
         "service": "demo-compras",
         "anthropic_configured": anthropic_client is not None,
-        "rate_limit": f"{rate_limit}/minute"
+        "rate_limit": RATE_LIMIT
     }
 
 
@@ -278,7 +295,7 @@ async def root():
 
 
 @app.post("/search", response_model=PurchaseResponse)
-@limiter.limit(f"{rate_limit}/minute")
+@limiter.limit(RATE_LIMIT)
 async def search_suppliers(body: PurchaseRequest, request: Request):
     """
     Search suppliers for a product and get purchase recommendations.
