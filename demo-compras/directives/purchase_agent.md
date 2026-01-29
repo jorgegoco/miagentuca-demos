@@ -1,10 +1,10 @@
 # Purchase Agent Directive
 
 ## Purpose
-Assist hardware store procurement by searching suppliers, comparing prices, and generating purchase recommendations.
+Assist any business with procurement by searching suppliers, comparing prices, and generating purchase recommendations. The agent auto-detects the product category and selects appropriate Spanish suppliers.
 
 ## Input
-- **Product description**: What the user wants to buy (e.g., "100 tornillos de 6mm acero inoxidable")
+- **Product description**: What the user wants to buy (e.g., "1 paquete de folios A4", "100 tornillos de 6mm acero inoxidable", "caja de guantes de nitrilo")
 - **Quantity**: How many units needed
 - **Urgency**: normal, urgent, very_urgent
 
@@ -13,6 +13,7 @@ Assist hardware store procurement by searching suppliers, comparing prices, and 
 ### Step 1: Parse Request
 Extract from user input:
 - Product type and specifications
+- Auto-detect product category
 - Quantity needed
 - Delivery urgency
 - Any brand preferences
@@ -20,15 +21,20 @@ Extract from user input:
 ### Step 2: Search Suppliers
 Use AI to simulate supplier search. Suppliers must be:
 - Real Spanish companies appropriate for the product category
-- Category-specific (don't use electrical distributors for construction materials)
+- Category-specific (auto-detected from the product description)
 
 Supplier pools by category:
+- Material de oficina: Lyreco, Staples, RAJA España, Office Depot, Amazon Business
+- Informática/tecnología: PcComponentes, Amazon Business, Esprinet, LDLC, Coolmod
+- Hostelería/alimentación: Makro, GM Food, Miró, Distriplus, Coviran
+- Limpieza/higiene: Papelmatic, Proquimia, Distriplus, Amazon Business, Leroy Merlin Pro
 - Tornillería/fijaciones: Würth España, Bricomart, Leroy Merlin Pro, Saltoki, Coferdroza
 - Herramientas eléctricas: Würth España, Leroy Merlin Pro, Bricomart, Saltoki, Makita España
 - Material eléctrico: Rexel, Saltoki, Grupo Electro Stocks, Sonepar, Leroy Merlin Pro
 - Construcción/albañilería: Bricomart, BigMat, Leroy Merlin Pro, Punto de la Construcción, Cemex
 - Fontanería: Saltoki, Salvador Escoda, Leroy Merlin Pro, Bricomart, Roca
 - Pintura: Bricomart, Leroy Merlin Pro, AkzoNobel, Pinturas Isaval, Jotun
+- Otro (productos generales): Amazon Business, ManoMano, Leroy Merlin Pro, Alibaba España, RAJA España
 
 ### Step 3: Compare Options
 For each supplier, evaluate:
@@ -86,7 +92,7 @@ Ask for clarification or make reasonable assumptions, noting them in response.
 Flag that bulk/wholesale pricing may apply and recommend direct contact.
 
 ## Price Accuracy
-The system prompt includes reference price ranges for common product categories (screws, power tools, cables, construction, plumbing, paint). Claude must generate prices WITHIN these ranges. This was added to fix unrealistic pricing issues discovered during testing.
+The system prompt includes reference price ranges for many product categories (office supplies, tech, hospitality, cleaning, screws, power tools, cables, construction, plumbing, paint). Claude must generate prices WITHIN these ranges. If a product doesn't appear in the references, Claude extrapolates from similar products. This was added to fix unrealistic pricing issues discovered during testing.
 
 ## Spanish Context
 - All prices in EUR, sin IVA

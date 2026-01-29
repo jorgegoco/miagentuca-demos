@@ -1,6 +1,6 @@
 # Demo Compras - Purchase Agent
 
-AI-powered procurement assistant for hardware stores. Search suppliers, compare prices, and get purchase recommendations.
+AI-powered procurement assistant for any business. Search suppliers, compare prices, and get purchase recommendations. Supports office supplies, tech, hospitality, cleaning, construction, and more — the agent auto-detects the product category.
 
 ## Live Demo
 
@@ -18,7 +18,8 @@ This demo showcases the 3-layer architecture for AI agents:
 
 ## Features
 
-- Searches Spanish suppliers (Würth, Bricomart, Leroy Merlin Pro, Saltoki, Rexel)
+- Auto-detects product category (office, tech, hospitality, cleaning, construction, plumbing, paint...)
+- Selects appropriate Spanish suppliers per category (Lyreco, PcComponentes, Makro, Würth, Bricomart...)
 - Compares prices, delivery times, and minimum orders
 - Calculates total costs including shipping
 - Recommends best price, fastest delivery, and best value options
@@ -35,8 +36,8 @@ This demo showcases the 3-layer architecture for AI agents:
 curl -X POST "https://compras.miagentuca.es/search" \
   -H "Content-Type: application/json" \
   -d '{
-    "product": "100 tornillos de 6mm acero inoxidable",
-    "quantity": 100,
+    "product": "1 paquete de folios A4",
+    "quantity": 1,
     "urgency": "normal"
   }'
 ```
@@ -46,26 +47,27 @@ curl -X POST "https://compras.miagentuca.es/search" \
 {
   "success": true,
   "product_parsed": {
-    "name": "Tornillos hexagonales 6mm acero inoxidable A2",
-    "specifications": "M6, DIN 933, longitud 20mm",
-    "quantity": 100
+    "name": "Papel A4 80g 500 hojas",
+    "category": "Material de oficina",
+    "specifications": "Folios A4, 80g/m², blanco, paquete 500 hojas",
+    "quantity": 1
   },
   "suppliers": [
     {
-      "name": "Würth España",
-      "unit_price": 0.18,
-      "total_price": 26.50,
+      "name": "Lyreco",
+      "unit_price": 4.50,
+      "total_price": 9.50,
       "delivery_days": 2,
-      "min_order": 50,
-      "shipping_cost": 8.50,
+      "min_order": 1,
+      "shipping_cost": 5.00,
       "in_stock": true
     }
   ],
   "recommendations": {
-    "best_price": "Würth España",
-    "fastest_delivery": "Würth España",
-    "best_value": "Würth España",
-    "reasoning": "Würth España ofrece el mejor precio total de 26.50€"
+    "best_price": "Lyreco",
+    "fastest_delivery": "Lyreco",
+    "best_value": "Lyreco",
+    "reasoning": "Lyreco ofrece el mejor precio total de 9.50€"
   }
 }
 ```

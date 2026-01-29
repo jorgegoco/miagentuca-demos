@@ -34,7 +34,7 @@ rate_limit = os.getenv("MAX_REQUESTS_PER_MINUTE", "5")
 # Initialize FastAPI
 app = FastAPI(
     title="Demo Compras - Purchase Agent",
-    description="AI-powered procurement assistant for hardware stores",
+    description="AI-powered procurement assistant for any business",
     version="1.0.0"
 )
 
@@ -91,10 +91,67 @@ class PurchaseResponse(BaseModel):
     error: Optional[str] = None
 
 
-SUPPLIER_SEARCH_SYSTEM = """Eres un agente de compras experto para ferreterías y suministros industriales en España.
+SUPPLIER_SEARCH_SYSTEM = """Eres un agente de compras experto para empresas en España.
 Tu trabajo es generar datos de proveedores con precios REALISTAS del mercado español actual.
+Detecta automáticamente la categoría del producto y usa proveedores apropiados.
 
 REGLAS DE PRECIOS - Usa estas referencias reales del mercado español (sin IVA):
+
+MATERIAL DE OFICINA:
+- Folios A4 500 hojas (80g): 4-6€/paquete
+- Folios A4 500 hojas (90g premium): 6-9€/paquete
+- Bolígrafos BIC/básicos: 0.15-0.40€/ud
+- Bolígrafos marca (Pilot, Uni-ball): 1-4€/ud
+- Archivadores A4: 1.50-4€/ud
+- Sobres americanos caja 500: 8-15€
+- Clips caja 100: 0.50-1.50€
+- Grapadora: 5-25€
+- Post-it pack 12: 8-15€
+- Tóner HP/Canon básico: 25-50€
+- Tóner HP/Canon original: 50-120€
+- Cartuchos tinta: 10-30€
+- Papel para impresora A3 500 hojas: 8-14€
+
+INFORMÁTICA Y TECNOLOGÍA:
+- Teclado USB básico: 8-20€
+- Teclado inalámbrico: 20-60€
+- Ratón óptico: 5-15€
+- Ratón ergonómico: 20-60€
+- Monitor 24" Full HD: 120-200€
+- Monitor 27" QHD: 200-400€
+- Disco duro externo 1TB: 45-70€
+- SSD externo 1TB: 70-130€
+- Cable HDMI 2m: 5-15€
+- Memoria USB 64GB: 6-15€
+- Webcam HD: 30-80€
+- Router WiFi 6: 40-120€
+
+HOSTELERÍA Y ALIMENTACIÓN:
+- Servilletas 1 capa 1000 uds: 8-15€
+- Servilletas 2 capas 100 uds: 2-5€
+- Vasos desechables 50 uds: 3-7€
+- Guantes desechables nitrilo caja 100: 5-12€
+- Film transparente rollo 300m: 8-18€
+- Papel aluminio rollo 100m: 12-22€
+- Bolsas basura 100L (rollo 10): 2-5€
+- Bayetas pack 10: 3-8€
+- Lavavajillas industrial 5L: 8-18€
+- Aceite de oliva virgen extra 5L: 25-45€
+- Aceite de girasol 5L: 6-12€
+- Harina 25kg: 12-20€
+- Azúcar 25kg: 18-28€
+
+LIMPIEZA E HIGIENE:
+- Lejía 5L: 2-5€
+- Fregasuelos 5L: 4-10€
+- Gel hidroalcohólico 5L: 12-25€
+- Jabón de manos 5L: 8-18€
+- Papel higiénico industrial rollo 200m: 2-5€/rollo
+- Papel secamanos rollo 150m: 3-6€/rollo
+- Bolsas de basura 30L (rollo 25): 1.50-4€
+- Escoba industrial: 5-15€
+- Fregona + cubo: 10-25€
+- Ambientador spray 750ml: 3-8€
 
 TORNILLERÍA Y FIJACIONES:
 - Tornillos acero inoxidable: 0.03-0.25€/ud según tamaño (M4: ~0.03€, M6: ~0.08€, M8: ~0.12€, M10: ~0.20€)
@@ -140,25 +197,32 @@ ENVÍO en España peninsular:
 - Palé / mercancía pesada: 25-60€
 - Envío gratis: solo en pedidos grandes (>200-500€ según proveedor)
 
-IMPORTANTE: Los precios deben estar DENTRO de estos rangos. Si el producto no aparece en la lista, extrapola a partir de productos similares."""
+IMPORTANTE: Los precios deben estar DENTRO de estos rangos. Si el producto no aparece en la lista, extrapola a partir de productos similares del mercado español."""
 
 SUPPLIER_SEARCH_PROMPT = """El usuario busca: "{product}" (cantidad: {quantity})
 Urgencia: {urgency}
 
-Genera datos de 4-5 proveedores españoles REALES que vendan este tipo de producto.
-Elige proveedores apropiados para la categoría del producto:
+PASO 1: Detecta la categoría del producto. Usa estas categorías y sus proveedores:
+- Material de oficina: Lyreco, Staples, RAJA España, Office Depot, Amazon Business
+- Informática/tecnología: PcComponentes, Amazon Business, Esprinet, LDLC, Coolmod
+- Hostelería/alimentación: Makro, GM Food, Miró, Distriplus, Coviran
+- Limpieza/higiene: Papelmatic, Proquimia, Distriplus, Amazon Business, Leroy Merlin Pro
 - Tornillería/fijaciones: Würth España, Bricomart, Leroy Merlin Pro, Saltoki, Coferdroza
 - Herramientas eléctricas: Würth España, Leroy Merlin Pro, Bricomart, Saltoki, Makita España
 - Material eléctrico: Rexel, Saltoki, Grupo Electro Stocks, Sonepar, Leroy Merlin Pro
 - Construcción/albañilería: Bricomart, BigMat, Leroy Merlin Pro, Punto de la Construcción, Cemex
 - Fontanería: Saltoki, Salvador Escoda, Leroy Merlin Pro, Bricomart, Roca
 - Pintura: Bricomart, Leroy Merlin Pro, AkzoNobel, Pinturas Isaval, Jotun
+- Otro (productos generales): Amazon Business, ManoMano, Leroy Merlin Pro, Alibaba España, RAJA España
+
+PASO 2: Genera datos de 4-5 proveedores españoles REALES de la categoría detectada.
 
 Responde SOLO con JSON válido en este formato exacto:
 {{
   "product_parsed": {{
     "name": "nombre del producto normalizado",
-    "specifications": "especificaciones técnicas concretas (medidas, material, norma DIN/ISO si aplica)",
+    "category": "categoría detectada",
+    "specifications": "especificaciones concretas (gramaje, medidas, material, marca si procede)",
     "quantity": {quantity}
   }},
   "suppliers": [
@@ -176,7 +240,7 @@ Responde SOLO con JSON válido en este formato exacto:
 RECUERDA:
 - Precios sin IVA, en EUR, DENTRO de los rangos de referencia
 - Coste de envío coherente con el peso total del pedido
-- Pedido mínimo realista (1 para herramientas, 10-100 para tornillería)
+- Pedido mínimo realista (1 para productos caros, 1-10 para consumibles)
 - Al menos un proveedor debe tener stock agotado (in_stock: false)
 - Varía los días de entrega entre 1 y 7 días"""
 
