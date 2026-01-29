@@ -67,6 +67,7 @@ class SupplierInfo(BaseModel):
     """Supplier information."""
     name: str
     unit_price: float
+    unit: str
     total_price: float
     delivery_days: int
     min_order: int
@@ -197,6 +198,11 @@ ENVÍO en España peninsular:
 - Palé / mercancía pesada: 25-60€
 - Envío gratis: solo en pedidos grandes (>200-500€ según proveedor)
 
+NORMALIZACIÓN DE UNIDADES:
+- Si el usuario da una descripción vaga (ej: "unos guantes", "folios", "tornillos"), normaliza a la unidad comercial estándar más habitual (caja, paquete, bolsa, unidad...).
+- Ejemplos: "unos guantes de nitrilo" → caja de 100 uds. "folios" → paquete 500 hojas. "tornillos M6" → caja de 100 uds.
+- El campo "unit" debe indicar SIEMPRE a qué se refiere el precio unitario (ej: "caja 100 uds", "paquete 500 hojas", "saco 25kg", "unidad", "bote 5L").
+
 IMPORTANTE: Los precios deben estar DENTRO de estos rangos. Si el producto no aparece en la lista, extrapola a partir de productos similares del mercado español."""
 
 SUPPLIER_SEARCH_PROMPT = """El usuario busca: "{product}" (cantidad: {quantity})
@@ -229,6 +235,7 @@ Responde SOLO con JSON válido en este formato exacto:
     {{
       "name": "Nombre Proveedor Real",
       "unit_price": 0.00,
+      "unit": "unidad comercial (ej: caja 100 uds, paquete 500 hojas, unidad, saco 25kg)",
       "delivery_days": 0,
       "min_order": 0,
       "shipping_cost": 0.00,
@@ -318,6 +325,7 @@ async def search_suppliers(body: PurchaseRequest, request: Request):
             suppliers.append({
                 "name": s["name"],
                 "unit_price": s["unit_price"],
+                "unit": s.get("unit", "unidad"),
                 "total_price": total,
                 "delivery_days": s["delivery_days"],
                 "min_order": s["min_order"],

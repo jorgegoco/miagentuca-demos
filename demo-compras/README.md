@@ -56,6 +56,7 @@ curl -X POST "https://compras.miagentuca.es/search" \
     {
       "name": "Lyreco",
       "unit_price": 4.50,
+      "unit": "paquete 500 hojas",
       "total_price": 9.50,
       "delivery_days": 2,
       "min_order": 1,
