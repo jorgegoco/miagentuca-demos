@@ -108,7 +108,7 @@ def log_request(request: Request, *, endpoint: str, query: str, result: dict):
         "query": query,
         **result,
     }
-    request_logger.info(json.dumps(entry, ensure_ascii=False))
+    request_logger.info("[REQUEST_LOG] " + json.dumps(entry, ensure_ascii=False))
 
 
 class ClassificationResponse(BaseModel):
