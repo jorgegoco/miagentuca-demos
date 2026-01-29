@@ -9,6 +9,8 @@ and generate 3-layer architecture specifications.
 import os
 import sys
 import json
+import logging
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Request
@@ -72,6 +74,33 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Initialize Anthropic client
 anthropic_client = anthropic.Anthropic(api_key=anthropic_api_key) if anthropic_api_key else None
+
+# Structured request logger
+request_logger = logging.getLogger("request_log")
+request_logger.setLevel(logging.INFO)
+_handler = logging.StreamHandler()
+_handler.setFormatter(logging.Formatter("%(message)s"))
+request_logger.addHandler(_handler)
+request_logger.propagate = False
+
+
+def log_request(request: Request, *, endpoint: str, query: str, result: dict):
+    """Log structured request data for analytics (stdout → Docker/Easypanel)."""
+    entry = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "service": "demo-explain-agent",
+        "endpoint": endpoint,
+        "method": request.method,
+        "ip": get_real_ip(request),
+        "ip_chain": request.headers.get("X-Forwarded-For", ""),
+        "user_agent": request.headers.get("User-Agent", ""),
+        "referer": request.headers.get("Referer", ""),
+        "origin": request.headers.get("Origin", ""),
+        "accept_language": request.headers.get("Accept-Language", ""),
+        "query": query,
+        **result,
+    }
+    request_logger.info(json.dumps(entry, ensure_ascii=False))
 
 
 class ExplainRequest(BaseModel):
@@ -206,14 +235,22 @@ async def explain_process(body: ExplainRequest, request: Request):
                 steps=["Paso 1", "Paso 2", "Paso 3"]
             )
 
+        analysis = result.get("process_analysis", {
+            "goal": "Objetivo no especificado",
+            "inputs": [],
+            "outputs": [],
+            "complexity": "medium"
+        })
+
+        log_request(request, endpoint="/explain", query=body.process_description[:200], result={
+            "success": True,
+            "language": body.language,
+            "complexity": analysis.get("complexity", ""),
+        })
+
         return ExplainResponse(
             success=True,
-            process_analysis=ProcessAnalysis(**result.get("process_analysis", {
-                "goal": "Objetivo no especificado",
-                "inputs": [],
-                "outputs": [],
-                "complexity": "medium"
-            })),
+            process_analysis=ProcessAnalysis(**analysis),
             directive=result.get("directive", ""),
             execution_code=result.get("execution_code", ""),
             flowchart=flowchart,
@@ -222,6 +259,10 @@ async def explain_process(body: ExplainRequest, request: Request):
         )
 
     except json.JSONDecodeError as e:
+        log_request(request, endpoint="/explain", query=body.process_description[:200], result={
+            "success": False,
+            "error": f"Error parsing response: {str(e)}",
+        })
         return ExplainResponse(
             success=False,
             process_analysis=None,
@@ -232,6 +273,10 @@ async def explain_process(body: ExplainRequest, request: Request):
             error=f"Error parsing response: {str(e)}"
         )
     except anthropic.APIError as e:
+        log_request(request, endpoint="/explain", query=body.process_description[:200], result={
+            "success": False,
+            "error": f"Anthropic API error: {str(e)}",
+        })
         raise HTTPException(
             status_code=502,
             detail=f"Anthropic API error: {str(e)}"

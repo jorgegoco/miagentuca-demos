@@ -7,8 +7,11 @@ Reads directives, calls execution tools, interacts with Claude API.
 
 import os
 import sys
+import json
+import logging
 from pathlib import Path
 from typing import Optional
+from datetime import datetime, timezone
 import tempfile
 import time
 
@@ -79,6 +82,33 @@ anthropic_client = anthropic.Anthropic(api_key=anthropic_api_key) if anthropic_a
 
 # Configuration
 MAX_FILE_SIZE_MB = int(os.getenv("MAX_FILE_SIZE_MB", 2))
+
+# Structured request logger
+request_logger = logging.getLogger("request_log")
+request_logger.setLevel(logging.INFO)
+_handler = logging.StreamHandler()
+_handler.setFormatter(logging.Formatter("%(message)s"))
+request_logger.addHandler(_handler)
+request_logger.propagate = False
+
+
+def log_request(request: Request, *, endpoint: str, query: str, result: dict):
+    """Log structured request data for analytics (stdout → Docker/Easypanel)."""
+    entry = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "service": "demo-gestoria",
+        "endpoint": endpoint,
+        "method": request.method,
+        "ip": get_real_ip(request),
+        "ip_chain": request.headers.get("X-Forwarded-For", ""),
+        "user_agent": request.headers.get("User-Agent", ""),
+        "referer": request.headers.get("Referer", ""),
+        "origin": request.headers.get("Origin", ""),
+        "accept_language": request.headers.get("Accept-Language", ""),
+        "query": query,
+        **result,
+    }
+    request_logger.info(json.dumps(entry, ensure_ascii=False))
 
 
 class ClassificationResponse(BaseModel):
@@ -228,7 +258,6 @@ Return ONLY valid JSON in this exact format:
             response_text = message.content[0].text.strip()
 
             # Extract JSON from response (Claude sometimes adds markdown)
-            import json
             if "```json" in response_text:
                 json_start = response_text.find("```json") + 7
                 json_end = response_text.find("```", json_start)
@@ -245,6 +274,13 @@ Return ONLY valid JSON in this exact format:
             if warning:
                 notes = f"{warning} {notes}".strip()
 
+            log_request(request, endpoint="/classify", query=file.filename or "", result={
+                "success": True,
+                "file_size_mb": round(file_size_mb, 2),
+                "document_type": result.get("document_type", ""),
+                "confidence": result.get("confidence", 0),
+            })
+
             return ClassificationResponse(
                 success=True,
                 document_type=result.get("document_type"),
@@ -254,12 +290,20 @@ Return ONLY valid JSON in this exact format:
             )
 
         except anthropic.APIError as e:
+            log_request(request, endpoint="/classify", query=file.filename or "", result={
+                "success": False,
+                "error": f"API error: {str(e)}",
+            })
             return ClassificationResponse(
                 success=False,
                 error=f"API error: {str(e)}"
             )
 
         except json.JSONDecodeError:
+            log_request(request, endpoint="/classify", query=file.filename or "", result={
+                "success": False,
+                "error": "Failed to parse classification results",
+            })
             return ClassificationResponse(
                 success=False,
                 error="Failed to parse classification results"
@@ -269,6 +313,10 @@ Return ONLY valid JSON in this exact format:
         raise
 
     except Exception as e:
+        log_request(request, endpoint="/classify", query=file.filename or "", result={
+            "success": False,
+            "error": f"Unexpected error: {str(e)}",
+        })
         return ClassificationResponse(
             success=False,
             error=f"Unexpected error: {str(e)}"
