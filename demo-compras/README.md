@@ -23,7 +23,7 @@ This demo showcases the 3-layer architecture for AI agents:
 - Compares prices, delivery times, and minimum orders
 - Calculates total costs including shipping
 - Recommends best price, fastest delivery, and best value options
-- Rate limiting (5 requests/minute per IP)
+- Rate limiting (3 requests/minute + 20/day per IP)
 
 ## API Usage
 

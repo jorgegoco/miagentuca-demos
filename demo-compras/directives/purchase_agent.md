@@ -57,6 +57,7 @@ Provide:
   "success": true,
   "product_parsed": {
     "name": "string",
+    "category": "detected category",
     "specifications": "string",
     "quantity": number
   },
@@ -64,6 +65,7 @@ Provide:
     {
       "name": "string",
       "unit_price": number,
+      "unit": "commercial unit (e.g. caja 100 uds, paquete 500 hojas)",
       "total_price": number,
       "delivery_days": number,
       "min_order": number,
@@ -100,6 +102,16 @@ The system prompt includes reference price ranges for many product categories (o
 - Product names may be in Spanish
 - Shipping costs must be coherent with total order weight
 
+## Unit Normalization
+Vague inputs are normalized to standard commercial units. Examples:
+- "unos guantes" → caja de 100 uds
+- "folios" → paquete 500 hojas
+- "tornillos M6" → caja de 100 uds
+The `unit` field in each supplier response always clarifies what the price refers to.
+
 ## Rate Limiting
-- 5 requests per minute per IP
+- 3 requests per minute per IP + 20 requests per day per IP
+- Proxy-aware IP detection (X-Forwarded-For / X-Real-IP)
+- CORS restricted to miagentuca.es and demo subdomains
 - Max query length: 500 characters
+- Configurable via `RATE_LIMIT` env var (default: `3/minute;20/day`)

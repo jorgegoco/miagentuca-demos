@@ -7,7 +7,7 @@ Interactive demos showcasing AI agent capabilities for [miagentuca.es](https://m
 | Demo | URL | Description |
 |------|-----|-------------|
 | **Gestoría** | [gestoria.miagentuca.es](https://gestoria.miagentuca.es) | Document classifier for Spanish accounting |
-| **Compras** | [compras.miagentuca.es](https://compras.miagentuca.es) | Purchase agent for hardware procurement |
+| **Compras** | [compras.miagentuca.es](https://compras.miagentuca.es) | Universal purchase agent (auto-detects product category) |
 | **Explain** | [explain.miagentuca.es](https://explain.miagentuca.es) | Meta demo - shows how we build AI agents |
 
 ## Architecture
@@ -57,12 +57,13 @@ Upload a PDF document → AI classifies document type → Extracts key informati
 ---
 
 ### Compras - Purchase Agent
-Describe what you need → AI searches suppliers → Returns price comparison and recommendations
+Describe what you need → AI auto-detects category → Searches appropriate suppliers → Returns price comparison
 
-**Example:** "100 tornillos de 6mm acero inoxidable"
+**Examples:** "1 paquete de folios A4", "100 tornillos M6 inox", "caja guantes de nitrilo"
 
 **Features:**
-- Searches Spanish suppliers (Würth, Bricomart, Leroy Merlin Pro, etc.)
+- Auto-detects product category (office, tech, hospitality, cleaning, construction...)
+- Selects appropriate Spanish suppliers per category (Lyreco, PcComponentes, Makro, Würth...)
 - Compares prices, delivery times, minimum orders
 - Recommends best price, fastest delivery, best value
 
@@ -89,7 +90,7 @@ This demo shows potential clients exactly how we build AI solutions.
 - **Backend:** FastAPI + Python 3.12
 - **AI:** Anthropic Claude API
 - **Deployment:** Docker + Easypanel on Contabo VPS
-- **Rate Limiting:** SlowAPI (5 requests/minute per IP)
+- **Rate Limiting:** SlowAPI (3 requests/minute + 20/day per IP)
 - **SSL:** Let's Encrypt (via Traefik)
 
 ## Repository Structure
@@ -125,10 +126,10 @@ Each demo has interactive API documentation:
 
 ## Security
 
-- Rate limiting: 5 requests/minute per IP
+- Rate limiting: 3 requests/minute + 20/day per IP (proxy-aware)
 - File size limits: 2MB max for uploads
-- CORS enabled for miagentuca.es
-- HTTPS enforced
+- CORS restricted to miagentuca.es and demo subdomains
+- HTTPS enforced via Traefik
 
 ## License
 

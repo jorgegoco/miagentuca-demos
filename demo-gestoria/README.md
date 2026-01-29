@@ -15,7 +15,7 @@ This demo showcases the 3-layer architecture for AI agents:
 - ✅ Supports 8 Spanish document types
 - ✅ Extracts type-specific information (amounts, dates, companies, etc.)
 - ✅ Returns confidence scores
-- ✅ Rate limiting (5 requests/minute per IP)
+- ✅ Rate limiting (3 requests/minute + 20/day per IP)
 - ✅ 2MB file size limit
 - ✅ Handles edge cases (corrupted files, scanned images, etc.)
 
@@ -108,7 +108,7 @@ HOST=0.0.0.0
 PORT=8001
 
 # Rate limiting
-MAX_REQUESTS_PER_MINUTE=5
+RATE_LIMIT=3/minute;20/day
 MAX_FILE_SIZE_MB=2
 ```
 
