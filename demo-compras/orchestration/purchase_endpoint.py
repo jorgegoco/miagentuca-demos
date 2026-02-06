@@ -109,6 +109,12 @@ class PurchaseRequest(BaseModel):
     urgency: str = Field(default="normal", description="Urgency level: normal, urgent, very_urgent")
 
 
+class PriceRange(BaseModel):
+    """Price range for a supplier."""
+    low: float
+    high: float
+
+
 class SupplierInfo(BaseModel):
     """Supplier information."""
     name: str
@@ -119,6 +125,8 @@ class SupplierInfo(BaseModel):
     min_order: int
     shipping_cost: float
     in_stock: bool
+    price_confidence: Optional[str] = "estimated"
+    price_range: Optional[PriceRange] = None
 
 
 class Recommendations(BaseModel):
@@ -136,6 +144,8 @@ class PurchaseResponse(BaseModel):
     suppliers: list[SupplierInfo]
     recommendations: Recommendations
     procurement_tips: list[str] = []
+    procurement_strategy: Optional[str] = None
+    estimated_as_of: Optional[str] = None
     error: Optional[str] = None
 
 
@@ -268,6 +278,26 @@ CONSEJOS DE COMPRA (procurement_tips):
 - Ejemplos: "Los folios A4 de 80g son suficientes para impresoras láser estándar. Para impresión a doble cara, considere 90g." o "Compre guantes de nitrilo en cajas de 1000 unidades para ahorros del 15-20%."
 - Los tips deben ser concretos y accionables, no genéricos.
 
+RANGOS DE PRECIO (price_range):
+- Para cada proveedor, genera también un rango de precios (price_range) con "low" y "high".
+- El rango debe reflejar la variación real del mercado para ese proveedor: productos estables (folios, lejía) tienen rangos estrechos (10-15% spread), productos volátiles (aceite, tecnología) tienen rangos más amplios (15-25% spread).
+- El unit_price debe estar DENTRO del rango (idealmente cerca del punto medio).
+- El campo price_confidence debe ser "estimated" para precios basados en conocimiento general del mercado, o "reference" si el precio se basa en datos de catálogo conocidos.
+
+ESTRATEGIA DE COMPRA (procurement_strategy - OBLIGATORIO):
+- Genera un párrafo de 3-5 frases con consejo estratégico de compra ESPECÍFICO para este producto y cantidad.
+- NO repitas simplemente la comparación de precios. El objetivo es demostrar inteligencia de negocio.
+- Incluye al menos 2 de estos elementos:
+  * Patrones de consumo típicos (ej: "Para una oficina estándar, el consumo medio es de 2-3 paquetes por empleado al mes")
+  * Oportunidades de descuento por volumen (ej: "Pedidos trimestrales de X unidades suelen desbloquear un 10-15% de ahorro")
+  * Consideraciones de calidad o alternativas (ej: "El papel de 80g es estándar, pero el de 90g evita transparencias en impresión a doble cara")
+  * Recomendaciones de timing (ej: "Los precios de material de oficina suelen bajar un 5-10% en enero")
+  * Sugerencias de producto alternativo cuando sea relevante
+- El tono debe ser profesional y útil, como un consultor de compras experimentado.
+
+FECHA DE ESTIMACIÓN:
+- Incluye siempre el campo "estimated_as_of" con el mes y año actual en español (ej: "Febrero 2025", "Marzo 2025").
+
 IMPORTANTE: Los precios deben estar DENTRO de estos rangos. Si el producto no aparece en la lista, extrapola a partir de productos similares del mercado español."""
 
 SUPPLIER_SEARCH_PROMPT_TEMPLATE = """El usuario busca: "{product}" (cantidad: {quantity})
@@ -308,13 +338,17 @@ Responde SOLO con JSON válido en este formato exacto:
       "delivery_days": 0,
       "min_order": 0,
       "shipping_cost": 0.00,
-      "in_stock": true
+      "in_stock": true,
+      "price_confidence": "estimated",
+      "price_range": {{{{"low": 0.00, "high": 0.00}}}}
     }}}}
   ],
   "procurement_tips": [
     "Consejo práctico 1 específico para esta categoría de producto",
     "Consejo práctico 2 sobre cómo optimizar la compra"
-  ]
+  ],
+  "procurement_strategy": "Párrafo de 3-5 frases con consejo estratégico específico para este producto y cantidad...",
+  "estimated_as_of": "Mes Año"
 }}}}
 
 RECUERDA:
@@ -323,7 +357,10 @@ RECUERDA:
 - Pedido mínimo realista (1 para productos caros, 1-10 para consumibles)
 - Varía los días de entrega entre 1 y 7 días
 - Genera un spread de precios realista (el más caro al menos 25-40% más que el más barato)
-- procurement_tips: 2-3 consejos prácticos y específicos para este producto"""
+- procurement_tips: 2-3 consejos prácticos y específicos para este producto
+- Incluye price_range (low/high) para cada proveedor - el unit_price debe estar dentro del rango
+- procurement_strategy es OBLIGATORIO: 3-5 frases de consejo estratégico específico para este producto
+- estimated_as_of: mes y año actual en español"""
 
 
 def build_supplier_search_prompt(product: str, quantity: int, urgency: str) -> str:
@@ -401,7 +438,7 @@ async def search_suppliers(body: PurchaseRequest, request: Request):
         # Call Claude API
         message = anthropic_client.messages.create(
             model="claude-sonnet-4-20250514",
-            max_tokens=2000,
+            max_tokens=2500,
             system=SUPPLIER_SEARCH_SYSTEM,
             messages=[
                 {"role": "user", "content": prompt}
@@ -423,7 +460,7 @@ async def search_suppliers(body: PurchaseRequest, request: Request):
         suppliers = []
         for s in supplier_data.get("suppliers", []):
             total = round(s["unit_price"] * body.quantity + s["shipping_cost"], 2)
-            suppliers.append({
+            supplier_entry = {
                 "name": s["name"],
                 "unit_price": s["unit_price"],
                 "unit": s.get("unit", "unidad"),
@@ -431,8 +468,12 @@ async def search_suppliers(body: PurchaseRequest, request: Request):
                 "delivery_days": s["delivery_days"],
                 "min_order": s["min_order"],
                 "shipping_cost": s["shipping_cost"],
-                "in_stock": s["in_stock"]
-            })
+                "in_stock": s["in_stock"],
+                "price_confidence": s.get("price_confidence", "estimated"),
+            }
+            if s.get("price_range"):
+                supplier_entry["price_range"] = s["price_range"]
+            suppliers.append(supplier_entry)
 
         # Sort suppliers by price
         suppliers = sort_suppliers_by_price(suppliers)
@@ -449,6 +490,8 @@ async def search_suppliers(body: PurchaseRequest, request: Request):
         })
 
         procurement_tips = supplier_data.get("procurement_tips", [])
+        procurement_strategy = supplier_data.get("procurement_strategy")
+        estimated_as_of = supplier_data.get("estimated_as_of")
 
         log_request(request, endpoint="/search", query=body.product, result={
             "success": True,
@@ -464,6 +507,8 @@ async def search_suppliers(body: PurchaseRequest, request: Request):
             suppliers=suppliers,
             recommendations=Recommendations(**recommendations),
             procurement_tips=procurement_tips,
+            procurement_strategy=procurement_strategy,
+            estimated_as_of=estimated_as_of,
             error=None
         )
 

@@ -26,12 +26,21 @@ def calculate_total_cost(unit_price: float, quantity: int, shipping_cost: float)
     return round(unit_price * quantity + shipping_cost, 2)
 
 
+def get_effective_price(supplier: dict) -> float:
+    """Get comparable price, using range midpoint when available."""
+    if supplier.get("price_range"):
+        pr = supplier["price_range"]
+        if isinstance(pr, dict) and "low" in pr and "high" in pr:
+            return (pr["low"] + pr["high"]) / 2
+    return supplier.get("total_price") or supplier.get("unit_price") or float('inf')
+
+
 def find_best_price(suppliers: list[Supplier]) -> Optional[str]:
     """Find supplier with lowest total price (in stock only)."""
     in_stock = [s for s in suppliers if s["in_stock"]]
     if not in_stock:
         return None
-    return min(in_stock, key=lambda s: s["total_price"])["name"]
+    return min(in_stock, key=get_effective_price)["name"]
 
 
 def find_fastest_delivery(suppliers: list[Supplier]) -> Optional[str]:
@@ -61,7 +70,7 @@ def find_best_value(suppliers: list[Supplier], urgency: str = "normal") -> Optio
         slow_threshold = None
 
     def value_score(s: Supplier) -> float:
-        score = s["total_price"] + (s["delivery_days"] * day_penalty)
+        score = get_effective_price(s) + (s["delivery_days"] * day_penalty)
         if slow_threshold and s["delivery_days"] > slow_threshold:
             score += (s["delivery_days"] - slow_threshold) * 10
         return score
@@ -134,7 +143,7 @@ def analyze_suppliers(suppliers: list[Supplier], urgency: str = "normal", quanti
 
 def sort_suppliers_by_price(suppliers: list[Supplier]) -> list[Supplier]:
     """Sort suppliers by total price, in-stock first."""
-    return sorted(suppliers, key=lambda s: (not s["in_stock"], s["total_price"]))
+    return sorted(suppliers, key=lambda s: (not s["in_stock"], get_effective_price(s)))
 
 
 if __name__ == "__main__":
