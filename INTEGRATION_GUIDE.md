@@ -4,7 +4,7 @@ This document explains how to integrate the AI demos into the miagentuca.es land
 
 ## Available APIs
 
-All APIs are live and ready to use. CORS is enabled for all origins.
+All APIs are live and ready to use. CORS is enabled for `miagentuca.es`, `www.miagentuca.es`, each demo subdomain, and `localhost` (for development).
 
 | Demo | Base URL | Purpose |
 |------|----------|---------|
@@ -118,27 +118,37 @@ console.log(result.suppliers);  // Array of supplier options
 {
   "success": true,
   "product_parsed": {
-    "name": "Tornillos hexagonales 6mm acero inoxidable",
-    "specifications": "M6, DIN 933",
+    "name": "Tornillos hexagonales 6mm acero inoxidable A2",
+    "category": "Tornillería/fijaciones",
+    "specifications": "M6, DIN 933, acero inoxidable A2",
     "quantity": 100
   },
   "suppliers": [
     {
       "name": "Würth España",
-      "unit_price": 0.18,
-      "total_price": 26.50,
+      "unit_price": 0.08,
+      "unit": "caja 100 uds",
+      "total_price": 16.50,
       "delivery_days": 2,
       "min_order": 50,
       "shipping_cost": 8.50,
-      "in_stock": true
+      "in_stock": true,
+      "price_confidence": "estimated",
+      "price_range": { "low": 0.06, "high": 0.10 }
     }
   ],
   "recommendations": {
-    "best_price": "Würth España",
+    "best_price": "Bricomart",
     "fastest_delivery": "Würth España",
     "best_value": "Würth España",
-    "reasoning": "Würth España ofrece el mejor precio total de 26.50€"
+    "reasoning": "Würth España ofrece el mejor equilibrio precio-tiempo..."
   },
+  "procurement_tips": [
+    "Los tornillos inox A2 son suficientes para exteriores no costeros. Para ambiente marino, use A4.",
+    "Comprar en cajas de 500 o 1000 unidades reduce el precio un 15-20%."
+  ],
+  "procurement_strategy": "Para 100 tornillos M6, el pedido es relativamente pequeño...",
+  "estimated_as_of": "Febrero 2026",
   "error": null
 }
 ```
@@ -147,7 +157,7 @@ console.log(result.suppliers);  // Array of supplier options
 
 ## 3. Explain - Agent Architecture Generator
 
-**Describe a business process → Get complete agent specification**
+**Describe a business process → Get a structured DOE (Directive-Orchestration-Execution) specification**
 
 ### Endpoint
 ```
@@ -177,10 +187,12 @@ const result = await explainProcess(
   'Automatizar el envío de emails de bienvenida cuando un cliente se registra'
 );
 
-console.log(result.process_analysis);  // { goal, inputs, outputs, complexity }
-console.log(result.directive);         // Markdown SOP document
-console.log(result.execution_code);    // Python code skeleton
-console.log(result.flowchart);         // Mermaid diagram
+console.log(result.process_analysis);          // { goal, inputs, outputs, complexity }
+console.log(result.directive_summary);         // SOP approach overview
+console.log(result.steps);                     // Steps with DOE layer labels
+console.log(result.execution_capabilities);    // Real APIs/tools needed
+console.log(result.edge_cases);                // Edge cases and handling
+console.log(result.implementation_estimate);   // Time estimate
 ```
 
 ### Response Format
@@ -188,36 +200,54 @@ console.log(result.flowchart);         // Mermaid diagram
 {
   "success": true,
   "process_analysis": {
-    "goal": "Enviar emails de bienvenida personalizados",
-    "inputs": ["datos_cliente", "plantilla_email", "config_smtp"],
+    "goal": "Enviar emails de bienvenida personalizados a nuevos clientes",
+    "inputs": ["datos_registro_cliente", "plantilla_email", "config_smtp"],
     "outputs": ["email_enviado", "log_auditoria"],
     "complexity": "medium"
   },
-  "directive": "# Directiva del Agente\n\n## Propósito\n...",
-  "execution_code": "#!/usr/bin/env python3\n...",
-  "flowchart": "flowchart TB\n    subgraph L1[Capa 1: Directiva]\n...",
-  "implementation_notes": "Implementación estimada: 2-3 días...",
+  "directive_summary": "El agente monitorizará nuevos registros y enviará emails personalizados respetando horarios y evitando duplicados.",
+  "steps": [
+    {
+      "name": "Validación de datos",
+      "description": "Verificar que el email es válido y que no se ha enviado ya un email de bienvenida.",
+      "layer": "directive"
+    },
+    {
+      "name": "Selección de plantilla",
+      "description": "Determinar el tipo de cliente y seleccionar la plantilla de bienvenida adecuada.",
+      "layer": "orchestration"
+    },
+    {
+      "name": "Envío del email",
+      "description": "Enviar email via API de Gmail con la plantilla seleccionada y reintentos automáticos.",
+      "layer": "execution"
+    }
+  ],
+  "execution_capabilities": [
+    {
+      "description": "Envío de emails transaccionales",
+      "tool": "Gmail API / SendGrid"
+    },
+    {
+      "description": "Consulta de registros de clientes",
+      "tool": "Base de datos PostgreSQL"
+    }
+  ],
+  "edge_cases": [
+    "Email inválido: marcar para revisión manual y notificar al equipo de soporte",
+    "Fallo de SMTP: cola de reintentos con backoff exponencial"
+  ],
+  "implementation_estimate": "1-2 semanas de desarrollo",
+  "implementation_notes": "Considerar integración con SendGrid para mayor confiabilidad.",
   "error": null
 }
 ```
 
-### Rendering the Flowchart
-The `flowchart` field contains Mermaid syntax. To render it:
-
-```html
-<!-- Include Mermaid.js -->
-<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
-
-<div class="mermaid" id="flowchart-container"></div>
-
-<script>
-  mermaid.initialize({ startOnLoad: false });
-
-  // After getting the API response
-  document.getElementById('flowchart-container').innerHTML = result.flowchart;
-  mermaid.init(undefined, '#flowchart-container');
-</script>
-```
+### DOE Layer Labels
+Each step has a `layer` field indicating which architectural layer it belongs to:
+- `"directive"` - Rules and SOPs (what to do)
+- `"orchestration"` - AI decision-making (intelligent routing)
+- `"execution"` - Deterministic scripts (doing the work)
 
 ---
 
@@ -250,19 +280,19 @@ async function checkHealth() {
 
 ## Rate Limiting
 
-All endpoints are rate-limited to **5 requests per minute per IP address**.
+All endpoints are rate-limited to **3 requests per minute + 20 requests per day** per IP address (proxy-aware via X-Forwarded-For).
 
-If exceeded, you'll receive:
+If exceeded, you'll receive HTTP 429:
 ```json
 {
-  "detail": "Rate limit exceeded: 5 per 1 minute"
+  "detail": "Rate limit exceeded"
 }
 ```
 
 **Recommendation:** Add UI feedback when rate limit is hit:
 ```javascript
 if (response.status === 429) {
-  showMessage('Has alcanzado el límite de solicitudes. Espera un minuto.');
+  showMessage('Has alcanzado el límite de solicitudes. Inténtalo de nuevo en un momento.');
 }
 ```
 
@@ -329,7 +359,13 @@ function validateFile(file) {
 
 ## CORS
 
-CORS is enabled for all origins (`*`), so you can call these APIs directly from your GitHub Pages site without any proxy.
+CORS is restricted to the following origins:
+- `https://miagentuca.es`
+- `https://www.miagentuca.es`
+- Each demo's own subdomain (e.g., `https://gestoria.miagentuca.es`)
+- `http://localhost:3000` and `http://localhost:5173` (for local development)
+
+Your GitHub Pages site at `miagentuca.es` can call these APIs directly without any proxy.
 
 ---
 

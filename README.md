@@ -64,7 +64,9 @@ Describe what you need → AI auto-detects category → Searches appropriate sup
 **Features:**
 - Auto-detects product category (office, tech, hospitality, cleaning, construction...)
 - Selects appropriate Spanish suppliers per category (Lyreco, PcComponentes, Makro, Würth...)
-- Compares prices, delivery times, minimum orders
+- Compares prices with realistic market ranges and confidence levels
+- Urgency-aware recommendations (normal, urgent, very_urgent)
+- Procurement strategy and actionable buying tips
 - Recommends best price, fastest delivery, best value
 
 **API:** `POST https://compras.miagentuca.es/search`
@@ -72,16 +74,17 @@ Describe what you need → AI auto-detects category → Searches appropriate sup
 ---
 
 ### Explain Agent - Meta Demo
-Describe a business process → AI generates complete agent specification
+Describe a business process → AI generates a structured DOE (Directive-Orchestration-Execution) specification
 
 **Generates:**
 - Process analysis (goal, inputs, outputs, complexity)
-- Directive document (markdown SOP)
-- Python execution code
-- Mermaid flowchart
-- Implementation notes
+- Directive summary (SOP approach overview)
+- Steps with DOE layer labels (directive / orchestration / execution)
+- Execution capabilities (real APIs and tools needed)
+- Edge cases and how the agent handles them
+- Implementation estimate and notes
 
-This demo shows potential clients exactly how we build AI solutions.
+This demo shows potential clients exactly how we build AI solutions — every step is visible and labeled with its architectural layer.
 
 **API:** `POST https://explain.miagentuca.es/explain`
 
