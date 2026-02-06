@@ -194,7 +194,8 @@ REGLAS:
 - Sé ESPECÍFICO para el proceso descrito, no genérico
 - Todo en español
 - implementation_estimate debe ser realista para una PYME (no exagerar ni minimizar)
-- La directive_summary NO debe repetir los pasos, sino explicar el enfoque general"""
+- La directive_summary NO debe repetir los pasos, sino explicar el enfoque general
+- NO incluyas texto fuera del JSON. Responde ÚNICAMENTE con el objeto JSON, sin explicaciones antes ni después."""
 
 
 @app.get("/health")
@@ -253,13 +254,51 @@ async def explain_process(body: ExplainRequest, request: Request):
         # Parse response
         response_text = message.content[0].text.strip()
 
-        # Extract JSON from response (handle markdown code blocks)
-        if "```json" in response_text:
-            response_text = response_text.split("```json")[1].split("```")[0].strip()
-        elif "```" in response_text:
-            response_text = response_text.split("```")[1].split("```")[0].strip()
+        # Extract JSON from response - try multiple strategies
+        json_text = None
 
-        result = json.loads(response_text)
+        # Strategy 1: Extract from ```json ... ``` code block
+        if "```json" in response_text:
+            json_text = response_text.split("```json")[1].split("```")[0].strip()
+        elif "```" in response_text:
+            json_text = response_text.split("```")[1].split("```")[0].strip()
+
+        # Strategy 2: Find the outermost { ... } using brace matching
+        if json_text is None or not json_text.startswith("{"):
+            first_brace = response_text.find("{")
+            if first_brace != -1:
+                # Walk through to find the matching closing brace
+                depth = 0
+                in_string = False
+                escape_next = False
+                last_brace = -1
+                for i in range(first_brace, len(response_text)):
+                    c = response_text[i]
+                    if escape_next:
+                        escape_next = False
+                        continue
+                    if c == "\\":
+                        escape_next = True
+                        continue
+                    if c == '"':
+                        in_string = not in_string
+                        continue
+                    if in_string:
+                        continue
+                    if c == "{":
+                        depth += 1
+                    elif c == "}":
+                        depth -= 1
+                        if depth == 0:
+                            last_brace = i
+                            break
+                if last_brace != -1:
+                    json_text = response_text[first_brace:last_brace + 1]
+
+        if json_text is None:
+            raise json.JSONDecodeError("No JSON object found in response", response_text, 0)
+
+        result = json.loads(json_text)
 
         # Parse steps
         steps_raw = result.get("steps", [])
