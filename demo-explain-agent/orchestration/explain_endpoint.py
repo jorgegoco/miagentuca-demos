@@ -23,7 +23,6 @@ import anthropic
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from execution.template_generator import validate_mermaid, generate_three_layer_flowchart
 
 # Load environment variables
 load_dotenv()
@@ -122,44 +121,80 @@ class ProcessAnalysis(BaseModel):
     complexity: str
 
 
+class DirectiveStep(BaseModel):
+    """A single step in the automated process."""
+    name: str
+    description: str
+    layer: str  # "directive" | "orchestration" | "execution"
+
+
+class ExecutionCapability(BaseModel):
+    """A tool or API the agent would use."""
+    description: str
+    tool: str
+
+
 class ExplainResponse(BaseModel):
     """Response model for explain endpoint."""
     success: bool
-    process_analysis: Optional[ProcessAnalysis]
-    directive: Optional[str]
-    execution_code: Optional[str]
-    flowchart: Optional[str]
-    implementation_notes: Optional[str]
+    process_analysis: Optional[ProcessAnalysis] = None
+    directive_summary: Optional[str] = None
+    steps: Optional[list[DirectiveStep]] = None
+    execution_capabilities: Optional[list[ExecutionCapability]] = None
+    edge_cases: Optional[list[str]] = None
+    implementation_estimate: Optional[str] = None
+    implementation_notes: Optional[str] = None
     error: Optional[str] = None
 
 
-EXPLAIN_PROMPT = """Eres un arquitecto de soluciones IA especializado en automatización de procesos.
+EXPLAIN_PROMPT = """Eres un arquitecto de soluciones IA especializado en automatización de procesos para PYMEs españolas.
 
 El cliente describe este proceso de negocio:
 "{process_description}"
 
-Analiza el proceso y genera una especificación completa usando la arquitectura de 3 capas.
+Analiza el proceso y genera una especificación usando la arquitectura DOE (Directiva-Orquestación-Ejecución).
 
 Responde SOLO con JSON válido en este formato exacto:
 {{
   "process_analysis": {{
-    "goal": "Objetivo principal del proceso",
+    "goal": "Objetivo principal en una frase",
     "inputs": ["entrada1", "entrada2"],
     "outputs": ["salida1", "salida2"],
     "complexity": "low|medium|high"
   }},
-  "directive": "# Directiva del Agente\\n\\n## Propósito\\n[Descripción clara del objetivo]\\n\\n## Entradas\\n- [Lista de entradas necesarias]\\n\\n## Proceso\\n### Paso 1: [Nombre]\\n[Descripción]\\n\\n### Paso 2: [Nombre]\\n[Descripción]\\n\\n## Salidas\\n- [Lista de salidas/entregables]\\n\\n## Casos Especiales\\n- [Manejo de errores y edge cases]",
-  "execution_code": "#!/usr/bin/env python3\\n# Capa 3: Ejecución\\n\\ndef procesar(entrada: str) -> dict:\\n    # Validación\\n    if not entrada:\\n        raise ValueError('Entrada requerida')\\n    \\n    # Procesamiento\\n    resultado = {{}}\\n    \\n    # TODO: Implementar lógica\\n    \\n    return resultado",
-  "flowchart": "flowchart TB\\n    subgraph L1[Capa 1: Directiva]\\n        D1[Reglas del proceso]\\n    end\\n    subgraph L2[Capa 2: Orquestación]\\n        O1[Agente IA]\\n    end\\n    subgraph L3[Capa 3: Ejecución]\\n        E1[Scripts Python]\\n    end\\n    User([Usuario]) --> L1\\n    L1 --> L2\\n    L2 --> L3\\n    L3 --> Result([Resultado])",
-  "implementation_notes": "Notas sobre la implementación, estimación de tiempo, y próximos pasos"
+  "directive_summary": "Resumen de 2-3 frases de lo que haría la directiva (la SOP del agente). Describe el objetivo y el enfoque general, no los pasos.",
+  "steps": [
+    {{
+      "name": "Nombre corto del paso",
+      "description": "1-2 frases explicando qué ocurre en este paso",
+      "layer": "directive|orchestration|execution"
+    }}
+  ],
+  "execution_capabilities": [
+    {{
+      "description": "Qué hace esta capacidad concreta",
+      "tool": "Herramienta o API (ej: Gmail API, Google Drive API, Google Calendar API, Webhook, Base de datos)"
+    }}
+  ],
+  "edge_cases": [
+    "Caso especial 1 y cómo se manejaría",
+    "Caso especial 2 y cómo se manejaría"
+  ],
+  "implementation_estimate": "Estimación realista (ej: '1-2 semanas de desarrollo')",
+  "implementation_notes": "1-2 frases con contexto adicional o recomendaciones"
 }}
 
-IMPORTANTE:
-- La directiva debe ser en español y usar formato Markdown
-- El código debe ser Python válido y seguir buenas prácticas
-- El flowchart debe ser Mermaid válido
-- Sé específico para el proceso descrito, no genérico
-- Incluye manejo de errores realista"""
+REGLAS:
+- Genera entre 3 y 6 pasos (steps). Cada paso debe indicar a qué capa pertenece:
+  * "directive" = reglas/SOP que definen qué hacer (ej: "Cuando se reciba un registro nuevo, verificar que el email es válido")
+  * "orchestration" = decisiones inteligentes del agente IA (ej: "Determinar el tipo de cliente y seleccionar la plantilla de bienvenida adecuada")
+  * "execution" = scripts deterministas que hacen el trabajo (ej: "Enviar email via API de Gmail con la plantilla seleccionada")
+- execution_capabilities: lista de 2-4 herramientas/APIs REALES que se necesitarían para implementar esto
+- edge_cases: 2-3 situaciones problemáticas y cómo las manejaría el agente
+- Sé ESPECÍFICO para el proceso descrito, no genérico
+- Todo en español
+- implementation_estimate debe ser realista para una PYME (no exagerar ni minimizar)
+- La directive_summary NO debe repetir los pasos, sino explicar el enfoque general"""
 
 
 @app.get("/health")
@@ -209,7 +244,7 @@ async def explain_process(body: ExplainRequest, request: Request):
         # Call Claude API
         message = anthropic_client.messages.create(
             model="claude-sonnet-4-20250514",
-            max_tokens=3000,
+            max_tokens=2000,
             messages=[
                 {"role": "user", "content": prompt}
             ]
@@ -226,14 +261,26 @@ async def explain_process(body: ExplainRequest, request: Request):
 
         result = json.loads(response_text)
 
-        # Validate flowchart
-        flowchart = result.get("flowchart", "")
-        if not validate_mermaid(flowchart):
-            # Generate a fallback flowchart
-            flowchart = generate_three_layer_flowchart(
-                process_name=result.get("process_analysis", {}).get("goal", "Proceso"),
-                steps=["Paso 1", "Paso 2", "Paso 3"]
-            )
+        # Parse steps
+        steps_raw = result.get("steps", [])
+        steps = []
+        for s in steps_raw:
+            if isinstance(s, dict) and "name" in s and "description" in s:
+                steps.append(DirectiveStep(
+                    name=s["name"],
+                    description=s["description"],
+                    layer=s.get("layer", "execution")
+                ))
+
+        # Parse execution capabilities
+        caps_raw = result.get("execution_capabilities", [])
+        capabilities = []
+        for c in caps_raw:
+            if isinstance(c, dict) and "description" in c and "tool" in c:
+                capabilities.append(ExecutionCapability(
+                    description=c["description"],
+                    tool=c["tool"]
+                ))
 
         analysis = result.get("process_analysis", {
             "goal": "Objetivo no especificado",
@@ -251,9 +298,11 @@ async def explain_process(body: ExplainRequest, request: Request):
         return ExplainResponse(
             success=True,
             process_analysis=ProcessAnalysis(**analysis),
-            directive=result.get("directive", ""),
-            execution_code=result.get("execution_code", ""),
-            flowchart=flowchart,
+            directive_summary=result.get("directive_summary", ""),
+            steps=steps if steps else None,
+            execution_capabilities=capabilities if capabilities else None,
+            edge_cases=result.get("edge_cases"),
+            implementation_estimate=result.get("implementation_estimate", ""),
             implementation_notes=result.get("implementation_notes", ""),
             error=None
         )
@@ -266,9 +315,11 @@ async def explain_process(body: ExplainRequest, request: Request):
         return ExplainResponse(
             success=False,
             process_analysis=None,
-            directive=None,
-            execution_code=None,
-            flowchart=None,
+            directive_summary=None,
+            steps=None,
+            execution_capabilities=None,
+            edge_cases=None,
+            implementation_estimate=None,
             implementation_notes=None,
             error=f"Error parsing response: {str(e)}"
         )

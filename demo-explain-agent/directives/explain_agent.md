@@ -17,27 +17,14 @@ Extract from the description:
 - Key decision points
 - Edge cases and error scenarios
 
-### Step 2: Generate the Directive (Layer 1)
-Create a markdown SOP that includes:
-- Purpose statement
-- Input specifications
-- Step-by-step process
-- Output format
-- Edge cases
-
-### Step 3: Generate Execution Code (Layer 3)
-Create Python code skeleton for:
-- Data validation functions
-- Core processing logic
-- Output formatting
-- Error handling
-
-### Step 4: Generate Architecture Diagram
-Create a Mermaid flowchart showing:
-- The 3 layers and their interactions
-- Data flow between components
-- Decision points
-- External API calls
+### Step 2: Generate Structured Specification
+Produce a visual-friendly specification with:
+- **Directive summary**: 2-3 sentence overview of the SOP approach
+- **Steps**: 3-6 labeled steps, each assigned to a DOE layer (directive/orchestration/execution)
+- **Execution capabilities**: 2-4 real APIs/tools needed for implementation
+- **Edge cases**: 2-3 problematic situations and how the agent handles them
+- **Implementation estimate**: Realistic timeline for a PYME
+- **Implementation notes**: Additional context or recommendations
 
 ## Output Format (JSON)
 ```json
@@ -49,19 +36,34 @@ Create a Mermaid flowchart showing:
     "outputs": ["list of outputs"],
     "complexity": "low|medium|high"
   },
-  "directive": "markdown string",
-  "execution_code": "python code string",
-  "flowchart": "mermaid diagram string",
-  "implementation_notes": "string"
+  "directive_summary": "2-3 sentence summary of the agent's SOP approach",
+  "steps": [
+    {
+      "name": "Step name",
+      "description": "1-2 sentence description",
+      "layer": "directive|orchestration|execution"
+    }
+  ],
+  "execution_capabilities": [
+    {
+      "description": "What this capability does",
+      "tool": "API or tool name"
+    }
+  ],
+  "edge_cases": ["Edge case 1 and handling", "Edge case 2 and handling"],
+  "implementation_estimate": "Realistic time estimate",
+  "implementation_notes": "Additional context"
 }
 ```
 
 ## Key Messaging
-This demo should communicate:
-1. **Transparency**: "This is exactly how we build your solution"
-2. **Reliability**: "Deterministic code + AI decision-making = consistent results"
-3. **Maintainability**: "Clear separation of concerns makes updates easy"
-4. **No black boxes**: "You can read, understand, and audit everything"
+This demo communicates:
+1. **We understand your process**: The analysis breaks down what you described into clear steps
+2. **DOE Architecture**: Each step is labeled with its layer (Directive/Orchestration/Execution)
+3. **Real tools**: We show actual APIs and tools that would be used
+4. **We think about edge cases**: Shows the agent anticipates problems
+5. **Realistic estimates**: Sets expectations for implementation
+6. **No black boxes**: Every step is visible and understandable
 
 ## Edge Cases
 

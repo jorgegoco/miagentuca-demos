@@ -3,18 +3,9 @@
 Template Generator - Deterministic code template generation
 
 This script handles the deterministic parts of template generation:
-- Validating Mermaid syntax
-- Formatting code blocks
-- Generating consistent structure
+- Formatting directive documents
+- Generating code templates
 """
-
-
-def validate_mermaid(diagram: str) -> bool:
-    """Basic validation of Mermaid diagram syntax."""
-    required_keywords = ["graph", "flowchart", "sequenceDiagram", "classDiagram"]
-    has_type = any(kw in diagram for kw in required_keywords)
-    has_arrows = "-->" in diagram or "---" in diagram or "==>" in diagram
-    return has_type or has_arrows
 
 
 def format_directive(
@@ -101,36 +92,6 @@ if __name__ == "__main__":
 '''
 
 
-def generate_three_layer_flowchart(process_name: str, steps: list[str]) -> str:
-    """Generate a Mermaid flowchart showing the 3-layer architecture."""
-
-    return f"""flowchart TB
-    subgraph L1[Capa 1: Directiva]
-        D1[📋 {process_name}]
-        D2[Reglas y SOPs]
-    end
-
-    subgraph L2[Capa 2: Orquestación]
-        O1[🤖 Agente IA]
-        O2[Decisiones inteligentes]
-    end
-
-    subgraph L3[Capa 3: Ejecución]
-        E1[⚙️ Scripts Python]
-        E2[Lógica determinística]
-    end
-
-    User([👤 Usuario]) --> L1
-    L1 --> L2
-    L2 --> L3
-    L3 --> Result([📊 Resultado])
-
-    L2 -.->|Lee instrucciones| L1
-    L2 -->|Ejecuta| L3
-    L3 -.->|Retorna datos| L2
-"""
-
-
 if __name__ == "__main__":
     # Test template generation
     print("=== Directive Template ===")
@@ -150,10 +111,3 @@ if __name__ == "__main__":
         description="Procesa un documento según la configuración"
     )
     print(code)
-
-    print("\n=== Flowchart ===")
-    flowchart = generate_three_layer_flowchart(
-        process_name="Clasificador de Documentos",
-        steps=["Extraer texto", "Clasificar", "Extraer datos"]
-    )
-    print(flowchart)
