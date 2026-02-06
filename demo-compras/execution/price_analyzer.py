@@ -42,50 +42,85 @@ def find_fastest_delivery(suppliers: list[Supplier]) -> Optional[str]:
     return min(in_stock, key=lambda s: s["delivery_days"])["name"]
 
 
-def find_best_value(suppliers: list[Supplier]) -> Optional[str]:
+def find_best_value(suppliers: list[Supplier], urgency: str = "normal") -> Optional[str]:
     """
     Find best value considering price and delivery time.
-    Score = total_price + (delivery_days * 5)
-    Lower is better.
+    Score = total_price + (delivery_days * day_penalty)
+    Lower is better. Urgent orders penalize slow delivery more heavily.
     """
     in_stock = [s for s in suppliers if s["in_stock"]]
     if not in_stock:
         return None
 
+    # Urgent orders weight delivery time much more heavily
+    if urgency in ("urgent", "very_urgent"):
+        day_penalty = 15
+        slow_threshold = 2  # penalize >2 days extra
+    else:
+        day_penalty = 5
+        slow_threshold = None
+
     def value_score(s: Supplier) -> float:
-        # Weight: €1 = 1 point, 1 day = €5 equivalent
-        return s["total_price"] + (s["delivery_days"] * 5)
+        score = s["total_price"] + (s["delivery_days"] * day_penalty)
+        if slow_threshold and s["delivery_days"] > slow_threshold:
+            score += (s["delivery_days"] - slow_threshold) * 10
+        return score
 
     return min(in_stock, key=value_score)["name"]
 
 
-def analyze_suppliers(suppliers: list[Supplier]) -> dict:
+def analyze_suppliers(suppliers: list[Supplier], urgency: str = "normal", quantity: int = 1) -> dict:
     """
     Analyze suppliers and return recommendations.
+    Accepts urgency and quantity for context-aware reasoning.
     """
     best_price = find_best_price(suppliers)
     fastest = find_fastest_delivery(suppliers)
-    best_value = find_best_value(suppliers)
+    best_value = find_best_value(suppliers, urgency=urgency)
+
+    in_stock = [s for s in suppliers if s["in_stock"]]
 
     # Generate reasoning
     reasoning_parts = []
 
-    if best_price:
-        price_supplier = next(s for s in suppliers if s["name"] == best_price)
-        reasoning_parts.append(
-            f"{best_price} ofrece el mejor precio total de {price_supplier['total_price']:.2f}€"
-        )
+    # Urgency context prefix
+    if urgency in ("urgent", "very_urgent"):
+        reasoning_parts.append("Dado la urgencia del pedido, recomendamos priorizar proveedores con stock inmediato y entrega rápida")
 
-    if fastest and fastest != best_price:
-        fast_supplier = next(s for s in suppliers if s["name"] == fastest)
+    if best_price and fastest and best_price == fastest:
+        # Same supplier is both cheapest and fastest
+        supplier = next(s for s in suppliers if s["name"] == best_price)
         reasoning_parts.append(
-            f"{fastest} tiene la entrega más rápida en {fast_supplier['delivery_days']} días"
+            f"{best_price} es la mejor opción: combina el precio más bajo "
+            f"({supplier['total_price']:.2f}€) con la entrega más rápida "
+            f"({supplier['delivery_days']} días)"
         )
+    else:
+        if best_price:
+            price_supplier = next(s for s in suppliers if s["name"] == best_price)
+            reasoning_parts.append(
+                f"{best_price} ofrece el mejor precio total de {price_supplier['total_price']:.2f}€"
+            )
 
-    if best_value and best_value not in [best_price, fastest]:
+        if fastest and fastest != best_price:
+            fast_supplier = next(s for s in suppliers if s["name"] == fastest)
+            reasoning_parts.append(
+                f"{fastest} tiene la entrega más rápida en {fast_supplier['delivery_days']} días"
+            )
+
+    if best_value and best_value not in (best_price, fastest):
         reasoning_parts.append(
             f"{best_value} ofrece el mejor equilibrio precio-tiempo"
         )
+
+    # Quantity context: total savings for large orders
+    if quantity > 50 and len(in_stock) >= 2:
+        prices = sorted([s["total_price"] for s in in_stock])
+        savings = round(prices[-1] - prices[0], 2)
+        if savings > 0:
+            reasoning_parts.append(
+                f"Para {quantity} unidades, la diferencia entre el proveedor más caro y el más barato es de {savings:.2f}€"
+            )
 
     reasoning = ". ".join(reasoning_parts) + "." if reasoning_parts else "No hay proveedores disponibles con stock."
 
@@ -134,7 +169,7 @@ if __name__ == "__main__":
         }
     ]
 
-    result = analyze_suppliers(test_suppliers)
+    result = analyze_suppliers(test_suppliers, urgency="normal", quantity=100)
     print("Recommendations:")
     print(f"  Best price: {result['best_price']}")
     print(f"  Fastest: {result['fastest_delivery']}")

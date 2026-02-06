@@ -135,6 +135,7 @@ class PurchaseResponse(BaseModel):
     product_parsed: dict
     suppliers: list[SupplierInfo]
     recommendations: Recommendations
+    procurement_tips: list[str] = []
     error: Optional[str] = None
 
 
@@ -249,10 +250,30 @@ NORMALIZACIÓN DE UNIDADES:
 - Ejemplos: "unos guantes de nitrilo" → caja de 100 uds. "folios" → paquete 500 hojas. "tornillos M6" → caja de 100 uds.
 - El campo "unit" debe indicar SIEMPRE a qué se refiere el precio unitario (ej: "caja 100 uds", "paquete 500 hojas", "saco 25kg", "unidad", "bote 5L").
 
+VARIACIÓN DE PRECIOS:
+- NO generes precios agrupados dentro de un 10% entre todos los proveedores. En la realidad, hay diferencias significativas.
+- Los proveedores generalistas (Amazon Business, Leroy Merlin) suelen ser un 15-30% más caros que los especialistas del sector.
+- Los mayoristas (Makro, Würth) suelen ofrecer los mejores precios pero con pedido mínimo más alto.
+- Genera un spread de precios realista: el proveedor más caro debería ser al menos un 25-40% más caro que el más barato.
+
+STOCK:
+- El stock debe variar de forma natural según el tipo de producto y la situación del mercado.
+- Productos de alta rotación (folios, tornillos estándar, lejía): casi siempre en stock.
+- Productos especializados o de marca concreta: posibilidad real de estar sin stock.
+- NO fuerces que siempre haya exactamente un proveedor sin stock. Refleja la realidad del producto.
+
+CONSEJOS DE COMPRA (procurement_tips):
+- Genera 2-3 consejos prácticos y específicos para la categoría del producto.
+- Deben ser útiles para alguien que compra este producto por primera vez o quiere optimizar.
+- Ejemplos: "Los folios A4 de 80g son suficientes para impresoras láser estándar. Para impresión a doble cara, considere 90g." o "Compre guantes de nitrilo en cajas de 1000 unidades para ahorros del 15-20%."
+- Los tips deben ser concretos y accionables, no genéricos.
+
 IMPORTANTE: Los precios deben estar DENTRO de estos rangos. Si el producto no aparece en la lista, extrapola a partir de productos similares del mercado español."""
 
-SUPPLIER_SEARCH_PROMPT = """El usuario busca: "{product}" (cantidad: {quantity})
+SUPPLIER_SEARCH_PROMPT_TEMPLATE = """El usuario busca: "{product}" (cantidad: {quantity})
 Urgencia: {urgency}
+
+{urgency_instructions}
 
 PASO 1: Detecta la categoría del producto. Usa estas categorías y sus proveedores:
 - Material de oficina: Lyreco, Staples, RAJA España, Office Depot, Amazon Business
@@ -269,16 +290,18 @@ PASO 1: Detecta la categoría del producto. Usa estas categorías y sus proveedo
 
 PASO 2: Genera datos de 4-5 proveedores españoles REALES de la categoría detectada.
 
+{quantity_instructions}
+
 Responde SOLO con JSON válido en este formato exacto:
-{{
-  "product_parsed": {{
+{{{{
+  "product_parsed": {{{{
     "name": "nombre del producto normalizado",
     "category": "categoría detectada",
     "specifications": "especificaciones concretas (gramaje, medidas, material, marca si procede)",
     "quantity": {quantity}
-  }},
+  }}}},
   "suppliers": [
-    {{
+    {{{{
       "name": "Nombre Proveedor Real",
       "unit_price": 0.00,
       "unit": "unidad comercial (ej: caja 100 uds, paquete 500 hojas, unidad, saco 25kg)",
@@ -286,16 +309,48 @@ Responde SOLO con JSON válido en este formato exacto:
       "min_order": 0,
       "shipping_cost": 0.00,
       "in_stock": true
-    }}
+    }}}}
+  ],
+  "procurement_tips": [
+    "Consejo práctico 1 específico para esta categoría de producto",
+    "Consejo práctico 2 sobre cómo optimizar la compra"
   ]
-}}
+}}}}
 
 RECUERDA:
 - Precios sin IVA, en EUR, DENTRO de los rangos de referencia
 - Coste de envío coherente con el peso total del pedido
 - Pedido mínimo realista (1 para productos caros, 1-10 para consumibles)
-- Al menos un proveedor debe tener stock agotado (in_stock: false)
-- Varía los días de entrega entre 1 y 7 días"""
+- Varía los días de entrega entre 1 y 7 días
+- Genera un spread de precios realista (el más caro al menos 25-40% más que el más barato)
+- procurement_tips: 2-3 consejos prácticos y específicos para este producto"""
+
+
+def build_supplier_search_prompt(product: str, quantity: int, urgency: str) -> str:
+    """Build the user prompt with urgency- and quantity-aware instructions."""
+    urgency_instructions = ""
+    if urgency in ("urgent", "very_urgent"):
+        urgency_instructions = (
+            "⚠️ PEDIDO URGENTE: Prioriza proveedores con stock disponible y entrega rápida (1-2 días). "
+            "Indica qué proveedores ofrecen envío express. "
+            "Penaliza en la recomendación a proveedores con entrega superior a 2 días."
+        )
+
+    quantity_instructions = ""
+    if quantity > 50:
+        quantity_instructions = (
+            "📦 PEDIDO EN VOLUMEN: Menciona la disponibilidad de descuentos por volumen. "
+            "Destaca los requisitos de pedido mínimo de forma prominente. "
+            "Si algún proveedor ofrece precios escalonados por cantidad, indícalo."
+        )
+
+    return SUPPLIER_SEARCH_PROMPT_TEMPLATE.format(
+        product=product,
+        quantity=quantity,
+        urgency=urgency,
+        urgency_instructions=urgency_instructions,
+        quantity_instructions=quantity_instructions,
+    )
 
 
 @app.get("/health")
@@ -337,7 +392,7 @@ async def search_suppliers(body: PurchaseRequest, request: Request):
 
     try:
         # Build prompt
-        prompt = SUPPLIER_SEARCH_PROMPT.format(
+        prompt = build_supplier_search_prompt(
             product=body.product,
             quantity=body.quantity,
             urgency=body.urgency
@@ -383,13 +438,17 @@ async def search_suppliers(body: PurchaseRequest, request: Request):
         suppliers = sort_suppliers_by_price(suppliers)
 
         # Analyze and get recommendations (deterministic Layer 3)
-        recommendations = analyze_suppliers(suppliers)
+        recommendations = analyze_suppliers(
+            suppliers, urgency=body.urgency, quantity=body.quantity
+        )
 
         parsed = supplier_data.get("product_parsed", {
             "name": body.product,
             "specifications": "",
             "quantity": body.quantity
         })
+
+        procurement_tips = supplier_data.get("procurement_tips", [])
 
         log_request(request, endpoint="/search", query=body.product, result={
             "success": True,
@@ -404,6 +463,7 @@ async def search_suppliers(body: PurchaseRequest, request: Request):
             product_parsed=parsed,
             suppliers=suppliers,
             recommendations=Recommendations(**recommendations),
+            procurement_tips=procurement_tips,
             error=None
         )
 
