@@ -9,6 +9,8 @@ Interactive demos showcasing AI agent capabilities for [miagentuca.es](https://m
 | **Gestoría** | [gestoria.miagentuca.es](https://gestoria.miagentuca.es) | Document classifier for Spanish accounting |
 | **Compras** | [compras.miagentuca.es](https://compras.miagentuca.es) | Universal purchase agent (auto-detects product category) |
 | **Explain** | [explain.miagentuca.es](https://explain.miagentuca.es) | Meta demo - shows how we build AI agents |
+| **ADE Parse** | [ade-parse.miagentuca.es](https://ade-parse.miagentuca.es) | Document parser & field extractor (LandingAI ADE) |
+| **ADE Pipeline** | [ade-pipeline.miagentuca.es](https://ade-pipeline.miagentuca.es) | Loan application document pipeline (LandingAI ADE) |
 
 ## Architecture
 
@@ -88,10 +90,48 @@ This demo shows potential clients exactly how we build AI solutions — every st
 
 **API:** `POST https://explain.miagentuca.es/explain`
 
+---
+
+### ADE Parse - Document Parser & Extractor
+Upload any document (PDF or image) → Vision-first AI parses the content → Optionally extract structured fields using a JSON schema
+
+**Capabilities:**
+- Parses documents into structured markdown with chunk detection (text, tables, figures, logos, forms, signatures)
+- Handles difficult documents: handwritten forms, charts, tables with missing gridlines, stamps, math notation
+- Optional field extraction using custom JSON schemas with visual grounding (source references)
+- Vision-first approach — understands layout and spatial relationships, not just text
+
+**Powered by:** LandingAI Agentic Document Extraction (DPT-2 model)
+
+**API:** `POST https://ade-parse.miagentuca.es/parse`
+
+---
+
+### ADE Pipeline - Loan Application Processor
+Upload multiple financial documents → Auto-classify each document type → Extract type-specific fields → Cross-validate across all documents
+
+**Supported document types:**
+- Government ID (passport, driver's license)
+- W-2 tax forms
+- Pay stubs
+- Bank statements
+- Investment statements
+
+**Validation checks:**
+- Name matching across all documents
+- Document year/recency verification
+- Total asset calculation (bank + investment balances)
+
+**Use case:** Banks, fintech, insurance — automate document intake for loan applications, KYC, claims processing
+
+**Powered by:** LandingAI Agentic Document Extraction (DPT-2 model)
+
+**API:** `POST https://ade-pipeline.miagentuca.es/process`
+
 ## Tech Stack
 
 - **Backend:** FastAPI + Python 3.12
-- **AI:** Anthropic Claude API
+- **AI:** Anthropic Claude API + LandingAI ADE (document understanding)
 - **Deployment:** Docker + Easypanel on Contabo VPS
 - **Rate Limiting:** SlowAPI (3 requests/minute + 20/day per IP)
 - **SSL:** Let's Encrypt (via Traefik)
@@ -112,7 +152,17 @@ miagentuca-demos/
 │   ├── execution/
 │   ├── orchestration/
 │   └── Dockerfile
-└── demo-explain-agent/        # Meta demo
+├── demo-explain-agent/        # Meta demo
+│   ├── directives/
+│   ├── execution/
+│   ├── orchestration/
+│   └── Dockerfile
+├── demo-ade-parse/            # Document parser (LandingAI ADE)
+│   ├── directives/
+│   ├── execution/
+│   ├── orchestration/
+│   └── Dockerfile
+└── demo-ade-pipeline/         # Loan application pipeline (LandingAI ADE)
     ├── directives/
     ├── execution/
     ├── orchestration/
@@ -126,11 +176,13 @@ Each demo has interactive API documentation:
 - https://gestoria.miagentuca.es/docs
 - https://compras.miagentuca.es/docs
 - https://explain.miagentuca.es/docs
+- https://ade-parse.miagentuca.es/docs
+- https://ade-pipeline.miagentuca.es/docs
 
 ## Security
 
 - Rate limiting: 3 requests/minute + 20/day per IP (proxy-aware)
-- File size limits: 2MB max for uploads
+- File size limits: 2MB for gestoria, 5MB for ADE services
 - CORS restricted to miagentuca.es and demo subdomains
 - HTTPS enforced via Traefik
 
