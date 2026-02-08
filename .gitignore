@@ -42,3 +42,6 @@ PROMPT_*.md
 CLAUDE.md
 AGENTS.md
 GEMINI.md
+
+# Course materials (context only, not deployed)
+new_project/
