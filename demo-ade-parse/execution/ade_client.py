@@ -19,7 +19,8 @@ def init_client() -> Optional[LandingAIADE]:
     api_key = os.getenv("VISION_AGENT_API_KEY")
     if not api_key or api_key == "your_key_here":
         return None
-    return LandingAIADE(apikey=api_key)
+    environment = os.getenv("ADE_ENVIRONMENT", "eu")
+    return LandingAIADE(apikey=api_key, environment=environment)
 
 
 def parse_document(file_path: str, model: str = "dpt-2-latest") -> Dict:
