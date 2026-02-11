@@ -86,6 +86,7 @@ Process multiple loan application documents (uploaded with arbitrary filenames),
 - **Missing year fields**: Skip year check for documents without date-related fields
 - **Zero assets**: Valid result (not all applicants have bank/investment statements)
 - **Single document**: Pipeline works with 1 document (validation has less to compare)
+- **ADE schema compatibility**: ADE Extract API does not support `allOf`, `$ref`, or `$defs` keywords. When using Pydantic models with Enum fields, `pydantic_to_json_schema()` may generate unsupported schemas. Use flat inline JSON schemas for categorization instead.
 
 ## Rate Limiting
 

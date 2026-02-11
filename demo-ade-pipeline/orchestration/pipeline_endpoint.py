@@ -26,9 +26,7 @@ from dotenv import load_dotenv
 # Add parent directory to path to import execution modules
 sys.path.append(str(Path(__file__).parent.parent))
 from execution.ade_client import init_client, parse_document, extract_fields
-from execution.document_schemas import (
-    DocType, SCHEMA_PER_DOC_TYPE,
-)
+from execution.document_schemas import SCHEMA_PER_DOC_TYPE
 from execution.validation_logic import run_all_validations, build_summary_table
 
 # For converting Pydantic schemas to JSON
@@ -96,8 +94,19 @@ ALLOWED_EXTENSIONS = {
     ".csv", ".xlsx",
 }
 
-# Precompute the DocType categorization schema (JSON)
-DOC_TYPE_JSON_SCHEMA = pydantic_to_json_schema(DocType)
+# DocType categorization schema (flat JSON, ADE doesn't support allOf/$ref)
+DOC_TYPE_JSON_SCHEMA = json.dumps({
+    "type": "object",
+    "properties": {
+        "type": {
+            "type": "string",
+            "enum": ["ID", "W2", "pay_stub", "bank_statement", "investment_statement"],
+            "description": "The type of document being analyzed.",
+            "title": "Document Type"
+        }
+    },
+    "required": ["type"]
+})
 
 # Structured request logger
 request_logger = logging.getLogger("request_log")
