@@ -43,5 +43,8 @@ CLAUDE.md
 AGENTS.md
 GEMINI.md
 
+# Per-service READMEs (keep locally, root README has public overview)
+demo-*/README.md
+
 # Course materials (context only, not deployed)
 new_project/
