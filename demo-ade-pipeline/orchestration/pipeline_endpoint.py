@@ -81,7 +81,20 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 # Configuration
 MAX_FILE_SIZE_MB = int(os.getenv("MAX_FILE_SIZE_MB", 5))
 MAX_FILES = int(os.getenv("MAX_FILES", 10))
-ALLOWED_EXTENSIONS = {".pdf", ".png", ".jpg", ".jpeg"}
+ALLOWED_EXTENSIONS = {
+    # PDFs
+    ".pdf",
+    # Images
+    ".jpeg", ".jpg", ".png", ".apng", ".bmp", ".dcx", ".dds", ".dib",
+    ".gd", ".gif", ".icns", ".jp2", ".pcx", ".ppm", ".psd", ".tga",
+    ".tif", ".tiff", ".webp",
+    # Text documents
+    ".doc", ".docx", ".odt",
+    # Presentations
+    ".odp", ".ppt", ".pptx",
+    # Spreadsheets
+    ".csv", ".xlsx",
+}
 
 # Precompute the DocType categorization schema (JSON)
 DOC_TYPE_JSON_SCHEMA = pydantic_to_json_schema(DocType)

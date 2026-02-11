@@ -6,14 +6,14 @@ Process multiple loan application documents (uploaded with arbitrary filenames),
 
 ## Input
 
-- **Document files**: Up to 10 files (PDF, PNG, JPG, JPEG), max 5MB each
+- **Document files**: Up to 10 files. Supports PDFs, images, text documents, presentations, and spreadsheets (see docs.landing.ai/ade/ade-file-types). Max 5MB each.
 - Documents arrive with arbitrary filenames (e.g., "uploadA.pdf", "image456.jpg")
 
 ## Process
 
 ### Step 1: Validate Input
 - Check file count does not exceed MAX_FILES (10)
-- Check each file extension is `.pdf`, `.png`, `.jpg`, or `.jpeg`
+- Check each file extension against supported ADE file types (see docs.landing.ai/ade/ade-file-types)
 - Check each file does not exceed MAX_FILE_SIZE_MB (5MB)
 - Save all files to temporary directory
 
