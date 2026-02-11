@@ -2,17 +2,17 @@
 
 ## Purpose
 
-Parse any document (PDF, PNG, JPG, JPEG) using LandingAI's Agentic Document Extraction (ADE) and optionally extract structured key-value pairs using a user-defined JSON schema.
+Parse any document using LandingAI's Agentic Document Extraction (ADE) and optionally extract structured key-value pairs using a user-defined JSON schema. Supports PDFs, images, text documents, presentations, and spreadsheets.
 
 ## Input
 
-- **Document file**: PDF or image (PNG, JPG, JPEG), max 5MB
+- **Document file**: PDF, image (JPEG, JPG, PNG, APNG, BMP, DCX, DDS, DIB, GD, GIF, ICNS, JP2, PCX, PPM, PSD, TGA, TIF, TIFF, WEBP), text document (DOC, DOCX, ODT), presentation (ODP, PPT, PPTX), or spreadsheet (CSV, XLSX). Max 5MB.
 - **Schema** (optional): JSON schema defining fields to extract from the document
 
 ## Process
 
 ### Step 1: Validate Input
-- Check file extension is `.pdf`, `.png`, `.jpg`, or `.jpeg`
+- Check file extension against supported ADE file types (see docs.landing.ai/ade/ade-file-types)
 - Check file size does not exceed MAX_FILE_SIZE_MB
 - Save to temporary file for processing
 

@@ -72,7 +72,20 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Configuration
 MAX_FILE_SIZE_MB = int(os.getenv("MAX_FILE_SIZE_MB", 5))
-ALLOWED_EXTENSIONS = {".pdf", ".png", ".jpg", ".jpeg"}
+ALLOWED_EXTENSIONS = {
+    # PDFs
+    ".pdf",
+    # Images
+    ".jpeg", ".jpg", ".png", ".apng", ".bmp", ".dcx", ".dds", ".dib",
+    ".gd", ".gif", ".icns", ".jp2", ".pcx", ".ppm", ".psd", ".tga",
+    ".tif", ".tiff", ".webp",
+    # Text documents
+    ".doc", ".docx", ".odt",
+    # Presentations
+    ".odp", ".ppt", ".pptx",
+    # Spreadsheets
+    ".csv", ".xlsx",
+}
 
 # Structured request logger
 request_logger = logging.getLogger("request_log")
@@ -146,7 +159,7 @@ async def parse_and_extract(
     """
     Parse an uploaded document and optionally extract fields.
 
-    - **file**: Document to parse (PDF, PNG, JPG, JPEG)
+    - **file**: Document to parse (PDF, images, Word, PowerPoint, Excel, CSV)
     - **schema**: Optional JSON schema for field extraction
     """
     # Validate file extension
