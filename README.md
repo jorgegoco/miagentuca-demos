@@ -11,6 +11,7 @@ Interactive demos showcasing AI agent capabilities for [miagentuca.es](https://m
 | **Explain** | [explain.miagentuca.es](https://explain.miagentuca.es) | Meta demo - shows how we build AI agents |
 | **ADE Parse** | [ade-parse.miagentuca.es](https://ade-parse.miagentuca.es) | Document parser & field extractor (LandingAI ADE) |
 | **ADE Pipeline** | [ade-pipeline.miagentuca.es](https://ade-pipeline.miagentuca.es) | Loan application document pipeline (LandingAI ADE) |
+| **ADE RAG** | [ade-rag.miagentuca.es](https://ade-rag.miagentuca.es) | Document Q&A with retrieval augmented generation |
 
 ## Architecture
 
@@ -128,10 +129,32 @@ Upload multiple financial documents → Auto-classify each document type → Ext
 
 **API:** `POST https://ade-pipeline.miagentuca.es/process`
 
+---
+
+### ADE RAG - Document Q&A
+Upload a document → AI parses into chunks → Embeds and indexes in vector database → Ask natural language questions → Semantic retrieval + AI-generated answers with source attribution
+
+**Features:**
+- Parses any document into chunks using LandingAI ADE
+- Embeds chunks with OpenAI text-embedding-3-small (1536-dim vectors)
+- Stores in ChromaDB for fast semantic search
+- Hybrid search: combine semantic similarity with chunk type filtering (e.g. tables only)
+- Claude generates grounded answers with source chunk references
+- Visual grounding: bbox coordinates for each source chunk
+
+**Use case:** Interactive document Q&A for reports, filings, manuals, contracts
+
+**Powered by:** LandingAI ADE + OpenAI Embeddings + ChromaDB + Anthropic Claude
+
+**APIs:**
+- `POST https://ade-rag.miagentuca.es/ingest` (upload document)
+- `POST https://ade-rag.miagentuca.es/query` (ask questions)
+
 ## Tech Stack
 
 - **Backend:** FastAPI + Python 3.12
-- **AI:** Anthropic Claude API + LandingAI ADE (document understanding)
+- **AI:** Anthropic Claude API + LandingAI ADE (document understanding) + OpenAI Embeddings
+- **Vector DB:** ChromaDB (for RAG demo)
 - **Deployment:** Docker + Easypanel on Contabo VPS
 - **Rate Limiting:** SlowAPI (3 requests/minute + 20/day per IP)
 - **SSL:** Let's Encrypt (via Traefik)
@@ -162,7 +185,12 @@ miagentuca-demos/
 │   ├── execution/
 │   ├── orchestration/
 │   └── Dockerfile
-└── demo-ade-pipeline/         # Loan application pipeline (LandingAI ADE)
+├── demo-ade-pipeline/         # Loan application pipeline (LandingAI ADE)
+│   ├── directives/
+│   ├── execution/
+│   ├── orchestration/
+│   └── Dockerfile
+└── demo-ade-rag/             # Document Q&A with RAG (ADE + ChromaDB + Claude)
     ├── directives/
     ├── execution/
     ├── orchestration/
@@ -178,11 +206,12 @@ Each demo has interactive API documentation:
 - https://explain.miagentuca.es/docs
 - https://ade-parse.miagentuca.es/docs
 - https://ade-pipeline.miagentuca.es/docs
+- https://ade-rag.miagentuca.es/docs
 
 ## Security
 
 - Rate limiting: 3 requests/minute + 20/day per IP (proxy-aware)
-- File size limits: 2MB for gestoria, 5MB for ADE services
+- File size limits: 2MB for gestoria, 5MB for ADE parse/pipeline, 10MB for ADE RAG
 - CORS restricted to miagentuca.es and demo subdomains
 - HTTPS enforced via Traefik
 

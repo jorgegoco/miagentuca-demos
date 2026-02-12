@@ -11,6 +11,7 @@ All APIs are live and ready to use. CORS is enabled for `miagentuca.es`, `www.mi
 | Gestoría | `https://gestoria.miagentuca.es` | Document classification |
 | Compras | `https://compras.miagentuca.es` | Supplier search |
 | Explain | `https://explain.miagentuca.es` | Agent architecture generator |
+| ADE RAG | `https://ade-rag.miagentuca.es` | Document Q&A with RAG |
 
 ---
 
@@ -261,7 +262,8 @@ async function checkHealth() {
   const services = [
     'https://gestoria.miagentuca.es/health',
     'https://compras.miagentuca.es/health',
-    'https://explain.miagentuca.es/health'
+    'https://explain.miagentuca.es/health',
+    'https://ade-rag.miagentuca.es/health'
   ];
 
   for (const url of services) {
@@ -369,12 +371,117 @@ Your GitHub Pages site at `miagentuca.es` can call these APIs directly without a
 
 ---
 
+## 4. ADE RAG - Document Q&A
+
+**Upload a document, then ask questions answered with retrieved context**
+
+### Endpoints
+```
+POST https://ade-rag.miagentuca.es/ingest
+Content-Type: multipart/form-data
+
+POST https://ade-rag.miagentuca.es/query
+Content-Type: application/json
+```
+
+### JavaScript Example
+```javascript
+// Step 1: Upload and index a document
+async function ingestDocument(file) {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await fetch('https://ade-rag.miagentuca.es/ingest', {
+    method: 'POST',
+    body: formData
+  });
+
+  return await response.json();
+}
+
+// Step 2: Ask questions about the document
+async function queryDocument(question, options = {}) {
+  const response = await fetch('https://ade-rag.miagentuca.es/query', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      question: question,
+      top_k: options.top_k || 3,
+      threshold: options.threshold || 0.25,
+      chunk_type_filter: options.chunk_type_filter || null
+    })
+  });
+
+  return await response.json();
+}
+
+// Usage
+const ingestResult = await ingestDocument(file);
+console.log(ingestResult.parsing.total_chunks);  // 453
+
+const answer = await queryDocument('What was the total revenue in 2023?');
+console.log(answer.answer);   // "According to the document..."
+console.log(answer.sources);  // Array of source chunks with similarity scores
+```
+
+### Ingest Response Format
+```json
+{
+  "success": true,
+  "document_name": "report.pdf",
+  "parsing": {
+    "total_pages": 10,
+    "total_chunks": 45,
+    "chunk_summary": {"chunkText": 30, "chunkTable": 10, "chunkFigure": 5},
+    "parse_duration_ms": 12345
+  },
+  "indexing": {
+    "chunks_embedded": 43,
+    "chunks_skipped": 2,
+    "embedding_duration_ms": 3456
+  }
+}
+```
+
+### Query Response Format
+```json
+{
+  "success": true,
+  "question": "What was the total revenue?",
+  "answer": "The total revenue was $383,285 million...",
+  "sources": [
+    {
+      "chunk_id": "abc-123",
+      "chunk_type": "chunkTable",
+      "page": 42,
+      "similarity": 0.847,
+      "text_preview": "Net sales: Products $298,085...",
+      "bbox": {"x0": 0.05, "y0": 0.30, "x1": 0.95, "y1": 0.60}
+    }
+  ],
+  "retrieval_info": {
+    "chunks_searched": 45,
+    "chunks_returned": 2,
+    "top_k": 3,
+    "threshold": 0.25,
+    "chunk_type_filter": null
+  }
+}
+```
+
+### Rate Limits
+- Ingest: 3 requests/minute, 10/day per IP
+- Query: 5 requests/minute, 30/day per IP
+
+---
+
 ## Interactive API Documentation
 
 For testing and exploring the APIs:
 - https://gestoria.miagentuca.es/docs
 - https://compras.miagentuca.es/docs
 - https://explain.miagentuca.es/docs
+- https://ade-rag.miagentuca.es/docs
 
 ---
 
@@ -385,5 +492,7 @@ For testing and exploring the APIs:
 | Gestoría | POST | `/classify` | `multipart/form-data` with PDF file |
 | Compras | POST | `/search` | JSON: `{ product, quantity, urgency }` |
 | Explain | POST | `/explain` | JSON: `{ process_description, language }` |
+| ADE RAG | POST | `/ingest` | `multipart/form-data` with document file |
+| ADE RAG | POST | `/query` | JSON: `{ question, top_k, threshold, chunk_type_filter }` |
 
 All responses are JSON with a `success` boolean and relevant data fields.
