@@ -28,7 +28,10 @@ def _get_client() -> chromadb.PersistentClient:
 def init_collection() -> chromadb.Collection:
     """Initialize or get the ChromaDB collection."""
     client = _get_client()
-    return client.get_or_create_collection(name=COLLECTION_NAME)
+    return client.get_or_create_collection(
+        name=COLLECTION_NAME,
+        metadata={"hnsw:space": "cosine"},
+    )
 
 
 def clear_collection():
@@ -38,7 +41,10 @@ def clear_collection():
         client.delete_collection(name=COLLECTION_NAME)
     except Exception:
         pass
-    client.get_or_create_collection(name=COLLECTION_NAME)
+    client.get_or_create_collection(
+        name=COLLECTION_NAME,
+        metadata={"hnsw:space": "cosine"},
+    )
 
 
 def add_chunks(chunks: List[Dict], embeddings: List[List[float]]) -> Dict:
