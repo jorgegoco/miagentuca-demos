@@ -43,6 +43,8 @@ app = FastAPI(
 )
 
 # CORS configuration
+# localhost origins are for demo/experimentation frontends only.
+# Production frontends would use dedicated origins.
 ALLOWED_ORIGINS = [
     "https://miagentuca.es",
     "https://www.miagentuca.es",
