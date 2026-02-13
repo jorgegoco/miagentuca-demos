@@ -19,8 +19,6 @@ import tempfile
 from fastapi import FastAPI, File, UploadFile, HTTPException, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.errors import RateLimitExceeded
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
@@ -74,13 +72,6 @@ def get_real_ip(request: Request) -> str:
         return real_ip
     return request.client.host if request.client else "127.0.0.1"
 
-
-# Rate limiting
-RATE_LIMIT_INGEST = os.getenv("RATE_LIMIT_INGEST", "3/minute;10/day")
-RATE_LIMIT_QUERY = os.getenv("RATE_LIMIT_QUERY", "5/minute;30/day")
-limiter = Limiter(key_func=get_real_ip)
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Configuration
 MAX_FILE_SIZE_MB = int(os.getenv("MAX_FILE_SIZE_MB", 10))
@@ -200,8 +191,6 @@ async def health_check():
         "document_loaded": doc_meta is not None,
         "document_name": doc_meta["document_name"] if doc_meta else None,
         "max_file_size_mb": MAX_FILE_SIZE_MB,
-        "rate_limit_ingest": RATE_LIMIT_INGEST,
-        "rate_limit_query": RATE_LIMIT_QUERY,
     }
 
 
@@ -227,7 +216,6 @@ async def document_status():
 
 
 @app.post("/ingest", response_model=IngestResponse)
-@limiter.limit(RATE_LIMIT_INGEST)
 async def ingest_document(
     request: Request,
     file: UploadFile = File(...),
@@ -368,7 +356,6 @@ async def ingest_document(
 
 
 @app.post("/query", response_model=QueryResponse)
-@limiter.limit(RATE_LIMIT_QUERY)
 async def query_document(
     request: Request,
     body: QueryRequest,
@@ -486,8 +473,6 @@ if __name__ == "__main__":
     print(f"\nStarting Demo ADE RAG - Document Q&A")
     print(f"   URL: http://{host}:{port}")
     print(f"   Docs: http://{host}:{port}/docs")
-    print(f"   Rate limit (ingest): {RATE_LIMIT_INGEST}")
-    print(f"   Rate limit (query):  {RATE_LIMIT_QUERY}")
     print(f"   Max file size: {MAX_FILE_SIZE_MB}MB\n")
 
     uvicorn.run(

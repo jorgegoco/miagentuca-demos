@@ -17,8 +17,6 @@ import tempfile
 from fastapi import FastAPI, File, Form, UploadFile, HTTPException, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.errors import RateLimitExceeded
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
@@ -65,12 +63,6 @@ def get_real_ip(request: Request) -> str:
         return real_ip
     return request.client.host if request.client else "127.0.0.1"
 
-
-# Rate limiting
-RATE_LIMIT = os.getenv("RATE_LIMIT", "3/minute;20/day")
-limiter = Limiter(key_func=get_real_ip)
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Configuration
 MAX_FILE_SIZE_MB = int(os.getenv("MAX_FILE_SIZE_MB", 5))
@@ -147,12 +139,10 @@ async def health_check():
         "status": "healthy",
         "ade_configured": ade_client is not None,
         "max_file_size_mb": MAX_FILE_SIZE_MB,
-        "rate_limit": RATE_LIMIT
     }
 
 
 @app.post("/parse", response_model=ParseResponse)
-@limiter.limit(RATE_LIMIT)
 async def parse_and_extract(
     request: Request,
     file: UploadFile = File(...),
@@ -280,7 +270,6 @@ if __name__ == "__main__":
     print(f"\nStarting Demo ADE Parse - Document Parser & Extractor")
     print(f"   URL: http://{host}:{port}")
     print(f"   Docs: http://{host}:{port}/docs")
-    print(f"   Rate limit: {RATE_LIMIT}")
     print(f"   Max file size: {MAX_FILE_SIZE_MB}MB\n")
 
     uvicorn.run(
