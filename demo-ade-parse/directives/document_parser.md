@@ -37,15 +37,33 @@ Parse any document using LandingAI's Agentic Document Extraction (ADE) and optio
 {
   "success": true,
   "parsing": {
-    "markdown": "full document markdown",
+    "markdown": "full document markdown with chunk ID anchors",
     "total_pages": 1,
-    "total_chunks": 12,
-    "chunk_summary": {"chunkText": 5, "chunkTable": 3},
-    "duration_ms": 1234
+    "total_chunks": 23,
+    "chunk_summary": {"chunkText": 14, "chunkTable": 2},
+    "duration_ms": 50375,
+    "chunks": [
+      {
+        "id": "uuid-string",
+        "type": "chunkText",
+        "markdown": "<a id='uuid'></a>\n\nChunk content...",
+        "grounding": {
+          "page": 0,
+          "box": {"top": 0.01, "bottom": 0.09, "left": 0.29, "right": 0.52}
+        }
+      }
+    ],
+    "grounding": {
+      "uuid-string": {"page": 0, "type": "chunkText", "box": {"top": 0.01, "bottom": 0.09, "left": 0.29, "right": 0.52}},
+      "0-a": {"page": 0, "type": "tableCell", "box": {"top": 0.30, "bottom": 0.35, "left": 0.05, "right": 0.25}}
+    },
+    "page_images": [
+      {"page": 0, "image_base64": "iVBOR...", "mime_type": "image/png"}
+    ]
   },
   "extraction": {
-    "fields": {"field_name": "value"},
-    "metadata": {"field_name": {"references": ["chunk_id"]}}
+    "fields": {"account_summary": {"current_charges": 155.15}},
+    "metadata": {"account_summary.current_charges": {"references": ["0-d"]}}
   },
   "error": null
 }

@@ -22,7 +22,7 @@ from dotenv import load_dotenv
 
 # Add parent directory to path to import execution module
 sys.path.append(str(Path(__file__).parent.parent))
-from execution.ade_client import init_client, parse_document, extract_fields
+from execution.ade_client import init_client, parse_document, extract_fields, render_page_images
 
 # Load environment variables
 load_dotenv()
@@ -192,12 +192,18 @@ async def parse_and_extract(
                 error=parse_result["error"]
             )
 
+        # Render page images before temp file cleanup
+        page_images = render_page_images(temp_file_path)
+
         parsing_data = {
             "markdown": parse_result["markdown"],
             "total_pages": parse_result["total_pages"],
             "total_chunks": parse_result["total_chunks"],
             "chunk_summary": parse_result["chunk_summary"],
             "duration_ms": parse_result["duration_ms"],
+            "chunks": parse_result["chunks"],
+            "grounding": parse_result["grounding"],
+            "page_images": page_images,
         }
 
         # Step 2: Extract fields if schema provided
