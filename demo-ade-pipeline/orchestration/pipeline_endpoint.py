@@ -6,6 +6,8 @@ Receives multiple document uploads, classifies each, extracts type-specific
 fields, validates across documents, and returns comprehensive results.
 """
 
+import io
+import base64
 import os
 import sys
 import json
@@ -14,6 +16,9 @@ from pathlib import Path
 from typing import Optional, List
 from datetime import datetime, timezone
 import tempfile
+
+import pymupdf
+from PIL import Image as PILImage, ImageDraw
 
 from fastapi import FastAPI, File, UploadFile, HTTPException, Request
 from fastapi.responses import JSONResponse
@@ -101,6 +106,82 @@ DOC_TYPE_JSON_SCHEMA = json.dumps({
     },
     "required": ["type"]
 })
+
+CHUNK_TYPE_COLORS = {
+    "chunkText": (40, 167, 69),
+    "chunkTable": (0, 123, 255),
+    "chunkMarginalia": (111, 66, 193),
+    "chunkFigure": (255, 0, 255),
+    "chunkLogo": (144, 238, 144),
+    "chunkCard": (255, 165, 0),
+    "chunkAttestation": (0, 255, 255),
+    "chunkScanCode": (255, 193, 7),
+    "chunkForm": (220, 20, 60),
+    "tableCell": (173, 216, 230),
+    "table": (70, 130, 180),
+}
+
+
+def render_page_as_pil(document_path: str, page_num: int) -> PILImage.Image:
+    """Render a single page of a PDF (or image file) as a PIL Image."""
+    path = Path(document_path)
+    if path.suffix.lower() == ".pdf":
+        pdf = pymupdf.open(str(path))
+        page = pdf[page_num]
+        pix = page.get_pixmap(matrix=pymupdf.Matrix(2, 2))
+        img = PILImage.frombytes("RGB", [pix.width, pix.height], pix.samples)
+        pdf.close()
+        return img
+    else:
+        img = PILImage.open(path)
+        if img.mode != "RGB":
+            img = img.convert("RGB")
+        return img
+
+
+def build_annotated_pages(document_path: str, extraction_metadata: dict,
+                           grounding: dict) -> list:
+    """
+    Build base64-encoded PNGs for each page that has extracted chunks (§3.7 logic).
+    Only chunks referenced by extraction_metadata are drawn.
+    """
+    if not extraction_metadata or not grounding:
+        return []
+
+    # Filter grounding to only chunks referenced by extracted fields
+    document_grounds = {}
+    for label, metadata_value in extraction_metadata.items():
+        refs = metadata_value.get("references", [])
+        if not refs:
+            continue
+        chunk_id = refs[0]
+        if chunk_id in grounding:
+            document_grounds[chunk_id] = grounding[chunk_id]
+
+    if not document_grounds:
+        return []
+
+    pages_with_chunks = sorted({g.page for g in document_grounds.values()})
+
+    annotated_pages = []
+    for page_num in pages_with_chunks:
+        img = render_page_as_pil(document_path, page_num)
+        draw = ImageDraw.Draw(img)
+        w, h = img.size
+        for gid, grounding_obj in document_grounds.items():
+            if grounding_obj.page != page_num:
+                continue
+            b = grounding_obj.box
+            x1, y1 = int(b.left * w), int(b.top * h)
+            x2, y2 = int(b.right * w), int(b.bottom * h)
+            color = CHUNK_TYPE_COLORS.get(grounding_obj.type, (128, 128, 128))
+            draw.rectangle([x1, y1, x2, y2], outline=color, width=3)
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        annotated_pages.append(base64.b64encode(buf.getvalue()).decode("utf-8"))
+
+    return annotated_pages
+
 
 # Structured request logger
 request_logger = logging.getLogger("request_log")
@@ -237,6 +318,7 @@ async def process_loan_documents(
                 "document_type": None,
                 "extracted_data": {},
                 "metadata": {},
+                "annotated_pages": [],
                 "error": None,
             }
 
@@ -249,6 +331,8 @@ async def process_loan_documents(
                 doc_result["error"] = parse_result["error"]
                 processed_documents.append(doc_result)
                 continue
+
+            doc_grounding = parse_result.get("grounding", {})
 
             # Categorize using first page markdown
             first_page_markdown = parse_result["splits_markdown"][0] \
@@ -280,6 +364,11 @@ async def process_loan_documents(
                 if ext_result["success"]:
                     doc_result["extracted_data"] = ext_result["fields"]
                     doc_result["metadata"] = ext_result["metadata"]
+                    doc_result["annotated_pages"] = build_annotated_pages(
+                        info["temp_path"],
+                        ext_result["metadata"],
+                        doc_grounding,
+                    )
                 else:
                     doc_result["error"] = f"Extraction failed: {ext_result['error']}"
             else:

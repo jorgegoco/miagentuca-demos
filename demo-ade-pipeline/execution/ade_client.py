@@ -72,6 +72,7 @@ def parse_document(file_path: str, model: str = "dpt-2-latest",
             "chunk_summary": chunk_summary,
             "duration_ms": parse_result.metadata.duration_ms,
             "job_id": parse_result.metadata.job_id,
+            "grounding": parse_result.grounding,
             "error": None,
         }
 
