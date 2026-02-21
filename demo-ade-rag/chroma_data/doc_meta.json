@@ -1,0 +1,14 @@
+{
+  "document_name": "apple_10k.pdf",
+  "total_pages": 1,
+  "total_chunks": 453,
+  "chunk_summary": {
+    "text": 338,
+    "logo": 1,
+    "table": 50,
+    "marginalia": 60,
+    "figure": 1,
+    "attestation": 3
+  },
+  "indexed_at": "2026-02-20T12:27:33.577982+00:00"
+}

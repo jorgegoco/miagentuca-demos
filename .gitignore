@@ -35,6 +35,9 @@ Thumbs.db
 *.db
 *.sqlite
 
+# Exception: pre-baked ChromaDB demo data (intentionally committed)
+!demo-ade-rag/chroma_data/**
+
 # Prerequisites prompt files (keep locally, don't commit)
 PROMPT_*.md
 

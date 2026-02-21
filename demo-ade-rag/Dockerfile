@@ -13,9 +13,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Create tmp directory and ChromaDB data directory
+# Create tmp directory
 RUN mkdir -p .tmp
-RUN mkdir -p /app/chroma_data
+
+# Pre-load demo ChromaDB data (apple_10k.pdf pre-indexed)
+# New uploads will overwrite this at runtime; on container restart it resets to demo state
+COPY chroma_data/ /app/chroma_data/
 
 # Expose port
 EXPOSE 8006
