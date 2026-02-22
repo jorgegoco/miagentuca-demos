@@ -80,6 +80,7 @@ ALLOWED_ORIGINS = [
     "https://miagentuca.es",
     "https://www.miagentuca.es",
     "https://ade-chat.miagentuca.es",
+    "https://miagentuca-demos-ade-chat.ud2cay.easypanel.host",
     "http://localhost:3000",
     "http://localhost:5173",
 ]
