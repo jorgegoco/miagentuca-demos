@@ -12,6 +12,7 @@ Interactive demos showcasing AI agent capabilities for [miagentuca.es](https://m
 | **ADE Parse** | [ade-parse.miagentuca.es](https://ade-parse.miagentuca.es) | Document parser & field extractor (LandingAI ADE) |
 | **ADE Pipeline** | [ade-pipeline.miagentuca.es](https://ade-pipeline.miagentuca.es) | Loan application document pipeline (LandingAI ADE) |
 | **ADE RAG** | [ade-rag.miagentuca.es](https://ade-rag.miagentuca.es) | Document Q&A with retrieval augmented generation |
+| **ADE Chat** | [ade-chat.miagentuca.es](https://ade-chat.miagentuca.es) | Multi-document research chatbot with session memory |
 
 ## Architecture
 
@@ -150,6 +151,28 @@ Upload a document → AI parses into chunks → Embeds and indexes in vector dat
 - `POST https://ade-rag.miagentuca.es/ingest` (upload document)
 - `POST https://ade-rag.miagentuca.es/query` (ask questions)
 
+---
+
+### ADE Chat - Multi-Document Research Chatbot
+Ships with 8 medical research papers pre-indexed → Upload additional PDFs → Multi-turn conversation → Agent searches the library and answers with source citations and cropped chunk images
+
+**Features:**
+- 8 common cold research papers indexed on first boot (idempotent pre-load)
+- Additive multi-document ChromaDB store — each paper gets a `doc_id`, none are ever cleared
+- Claude agent (Anthropic tool_use loop) decides when and what to search
+- In-memory session store with 2-hour TTL — full conversation history passed on each turn
+- Visual grounding: server-side PDF crop via PyMuPDF → PNG served as static file → plain `<img>` in frontend
+- Filter chat to a single document with `doc_id_filter`
+
+**Use case:** Conversational research assistant over a growing paper library
+
+**Powered by:** LandingAI ADE + OpenAI Embeddings + ChromaDB + Anthropic Claude (tool_use)
+
+**APIs:**
+- `POST https://ade-chat.miagentuca.es/ingest` (upload PDF)
+- `GET  https://ade-chat.miagentuca.es/documents` (list library)
+- `POST https://ade-chat.miagentuca.es/chat` (multi-turn chat)
+
 ## Tech Stack
 
 - **Backend:** FastAPI + Python 3.12
@@ -190,10 +213,17 @@ miagentuca-demos/
 │   ├── execution/
 │   ├── orchestration/
 │   └── Dockerfile
-└── demo-ade-rag/             # Document Q&A with RAG (ADE + ChromaDB + Claude)
+├── demo-ade-rag/             # Document Q&A with RAG (ADE + ChromaDB + Claude)
+│   ├── directives/
+│   ├── execution/
+│   ├── orchestration/
+│   └── Dockerfile
+└── demo-ade-chat/            # Multi-document research chatbot (Strands Agent + session memory)
     ├── directives/
     ├── execution/
     ├── orchestration/
+    ├── data/medical/          # 8 pre-loaded research papers
+    ├── scripts/               # Startup preload script
     └── Dockerfile
 ```
 
@@ -207,6 +237,7 @@ Each demo has interactive API documentation:
 - https://ade-parse.miagentuca.es/docs
 - https://ade-pipeline.miagentuca.es/docs
 - https://ade-rag.miagentuca.es/docs
+- https://ade-chat.miagentuca.es/docs
 
 ## Security
 
