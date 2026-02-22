@@ -9,4 +9,3 @@ pydantic==2.5.3
 openai
 chromadb
 anthropic
-strands-agents

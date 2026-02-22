@@ -154,7 +154,7 @@ Runs **before** uvicorn starts (see Dockerfile CMD).
 |----------|---------|---------|
 | `VISION_AGENT_API_KEY` | required | LandingAI ADE for PDF parsing |
 | `OPENAI_API_KEY` | required | OpenAI embeddings |
-| `ANTHROPIC_API_KEY` | required | Strands agent LLM backend |
+| `ANTHROPIC_API_KEY` | required | Anthropic API (tool_use agent loop) |
 | `ADE_ENVIRONMENT` | `eu` | LandingAI region |
 | `PORT` | `8007` | FastAPI port |
 | `MAX_FILE_SIZE_MB` | `20` | Upload size limit |

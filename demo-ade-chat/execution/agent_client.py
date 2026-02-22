@@ -1,19 +1,17 @@
 """
 Agent Client - Execution Layer
 
-Strands Agent backed by the Anthropic API (AnthropicModel).
-The agent has a single retrieval tool: search_documents().
-It decides when to search and what to search for based on the conversation.
+Multi-turn chat agent using the Anthropic API with tool_use.
+The model decides when to call search_documents() based on the conversation.
 
-Session history is managed externally (in chatbot_endpoint.py) and passed
-in as a messages list on each call, giving the agent full conversation context.
+No external agent framework needed — the anthropic package handles the
+tool-use loop natively, which is equivalent to Strands for this use case.
 """
 
 import os
 from typing import Dict, List, Optional, Tuple
 
-from strands import Agent, tool
-from strands.models.anthropic import AnthropicModel
+import anthropic
 
 from execution import embedding_client, chroma_store
 
@@ -35,60 +33,55 @@ Guidelines:
 - Be concise but thorough. Avoid speculation beyond what the papers say.
 """
 
+TOOLS = [
+    {
+        "name": "search_documents",
+        "description": (
+            "Search the document library for passages relevant to the query. "
+            "Returns formatted text passages with source metadata."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "A natural language search query.",
+                }
+            },
+            "required": ["query"],
+        },
+    }
+]
 
-def _build_retrieval_tool(
+
+def _run_search(
+    query: str,
     doc_id_filter: Optional[str],
     top_k: int,
     threshold: float,
-    retrieved_chunks_store: List[Dict],
-):
-    """
-    Build a Strands tool function with the given retrieval parameters baked in.
-    Also writes retrieved chunks into retrieved_chunks_store so the caller
-    can access them after the agent finishes.
-    """
+) -> Tuple[str, List[Dict]]:
+    """Execute semantic search and return (formatted_text, raw_chunks)."""
+    query_embedding = embedding_client.embed_text(query)
+    chunks = chroma_store.query_similar(
+        query_embedding=query_embedding,
+        top_k=top_k,
+        threshold=threshold,
+        doc_id_filter=doc_id_filter,
+    )
 
-    @tool
-    def search_documents(query: str) -> str:
-        """
-        Search the document library for passages relevant to the query.
-        Returns formatted text passages with source metadata.
+    if not chunks:
+        return "No relevant passages found for this query.", []
 
-        Args:
-            query: A natural language search query.
-        """
-        try:
-            query_embedding = embedding_client.embed_text(query)
-            chunks = chroma_store.query_similar(
-                query_embedding=query_embedding,
-                top_k=top_k,
-                threshold=threshold,
-                doc_id_filter=doc_id_filter,
-            )
+    formatted = []
+    for i, chunk in enumerate(chunks, 1):
+        label = (
+            f"[Source {i} | {chunk['doc_name']} | "
+            f"Page {chunk['page']} | Type: {chunk['chunk_type']} | "
+            f"Similarity: {chunk['similarity']:.2f}]"
+        )
+        formatted.append(f"{label}\n{chunk['text']}")
 
-            if not chunks:
-                return "No relevant passages found for this query."
-
-            # Store chunks so caller can attach them to the response
-            retrieved_chunks_store.clear()
-            retrieved_chunks_store.extend(chunks)
-
-            # Format chunks as readable context for the agent
-            formatted = []
-            for i, chunk in enumerate(chunks, 1):
-                source_label = (
-                    f"[Source {i} | {chunk['doc_name']} | "
-                    f"Page {chunk['page']} | Type: {chunk['chunk_type']} | "
-                    f"Similarity: {chunk['similarity']:.2f}]"
-                )
-                formatted.append(f"{source_label}\n{chunk['text']}")
-
-            return "\n\n---\n\n".join(formatted)
-
-        except Exception as e:
-            return f"Search failed: {str(e)}"
-
-    return search_documents
+    return "\n\n---\n\n".join(formatted), chunks
 
 
 def chat(
@@ -98,65 +91,67 @@ def chat(
     threshold: float = 0.25,
 ) -> Tuple[str, List[Dict]]:
     """
-    Run one turn of the research chatbot agent.
+    Run one turn of the research chatbot.
 
     Args:
-        messages: Full conversation history in format:
+        messages: Full conversation history:
                   [{"role": "user"|"assistant", "content": "..."}]
-                  The last message must be the user's current input.
-        doc_id_filter: If set, search is restricted to this document.
-        top_k: Number of chunks to retrieve.
-        threshold: Minimum similarity score for retrieval.
+                  The last item is the current user message.
+        doc_id_filter: Restrict search to one document's chunks.
+        top_k: Max chunks to retrieve per search.
+        threshold: Min similarity score.
 
     Returns:
-        Tuple of (answer_text, retrieved_chunks).
-        retrieved_chunks: List of source chunk dicts from the last search call.
+        (answer_text, retrieved_chunks) where retrieved_chunks are the
+        sources from the last search call the model made.
     """
     if not ANTHROPIC_API_KEY or ANTHROPIC_API_KEY == "your_key_here":
         raise RuntimeError("ANTHROPIC_API_KEY is not configured")
 
-    retrieved_chunks: List[Dict] = []
-    retrieval_tool = _build_retrieval_tool(
-        doc_id_filter=doc_id_filter,
-        top_k=top_k,
-        threshold=threshold,
-        retrieved_chunks_store=retrieved_chunks,
-    )
+    client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
-    model = AnthropicModel(
-        model_id=MODEL_ID,
-        api_key=ANTHROPIC_API_KEY,
-    )
+    # Convert session history to Anthropic message format
+    api_messages = [
+        {"role": msg["role"], "content": msg["content"]}
+        for msg in messages
+    ]
 
-    agent = Agent(
-        model=model,
-        system_prompt=SYSTEM_PROMPT,
-        tools=[retrieval_tool],
-    )
+    all_retrieved_chunks: List[Dict] = []
 
-    # Replay conversation history then run the latest user message
-    # Strands Agent supports passing messages directly for multi-turn context
-    # The last item in messages is the current user turn
-    current_message = messages[-1]["content"] if messages else ""
-    history = messages[:-1] if len(messages) > 1 else []
-
-    # Pass prior turns as context prefix in the system or via message history
-    # Strands supports messages kwarg for prior context
-    if history:
-        # Build a compact history string to prepend as context
-        history_lines = []
-        for msg in history:
-            role = "User" if msg["role"] == "user" else "Assistant"
-            history_lines.append(f"{role}: {msg['content']}")
-        history_text = "\n".join(history_lines)
-        full_message = (
-            f"[Previous conversation]\n{history_text}\n\n"
-            f"[Current question]\n{current_message}"
+    # Agentic loop: keep running until the model stops calling tools
+    while True:
+        response = client.messages.create(
+            model=MODEL_ID,
+            max_tokens=2048,
+            system=SYSTEM_PROMPT,
+            tools=TOOLS,
+            messages=api_messages,
         )
-    else:
-        full_message = current_message
 
-    response = agent(full_message)
-    answer = str(response)
+        if response.stop_reason == "tool_use":
+            # Execute each tool call the model requested
+            tool_results = []
+            for block in response.content:
+                if block.type == "tool_use" and block.name == "search_documents":
+                    query = block.input.get("query", "")
+                    result_text, chunks = _run_search(
+                        query, doc_id_filter, top_k, threshold
+                    )
+                    if chunks:
+                        all_retrieved_chunks = chunks  # keep last search results
+                    tool_results.append({
+                        "type": "tool_result",
+                        "tool_use_id": block.id,
+                        "content": result_text,
+                    })
 
-    return answer, retrieved_chunks
+            # Feed tool results back into the conversation
+            api_messages.append({"role": "assistant", "content": response.content})
+            api_messages.append({"role": "user", "content": tool_results})
+
+        else:
+            # Model is done — extract the final text answer
+            answer = "".join(
+                block.text for block in response.content if hasattr(block, "text")
+            )
+            return answer, all_retrieved_chunks
