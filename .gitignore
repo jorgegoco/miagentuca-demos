@@ -52,3 +52,6 @@ demo-*/README.md
 # Course materials (context only, not deployed)
 new_project/
 demo-ade-chat/new_proj/
+
+# Internal spec documents (keep locally, not for public repo)
+FRONTEND_SPEC.md
