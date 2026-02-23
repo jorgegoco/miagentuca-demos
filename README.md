@@ -218,7 +218,7 @@ miagentuca-demos/
 │   ├── execution/
 │   ├── orchestration/
 │   └── Dockerfile
-└── demo-ade-chat/            # Multi-document research chatbot (Strands Agent + session memory)
+└── demo-ade-chat/            # Multi-document research chatbot (Anthropic tool_use + session memory)
     ├── directives/
     ├── execution/
     ├── orchestration/
