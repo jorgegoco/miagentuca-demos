@@ -5,7 +5,7 @@ landingai-ade
 pymupdf
 pillow
 python-dotenv==1.0.0
-pydantic==2.5.3
+pydantic>=2.5.3,<3.0.0
 openai
 chromadb
 anthropic

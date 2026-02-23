@@ -54,6 +54,31 @@ TOOLS = [
 ]
 
 
+def _content_to_dicts(content) -> list:
+    """Convert Anthropic SDK content blocks (Pydantic models) to plain dicts.
+
+    Passing live Pydantic model objects back into client.messages.create() causes
+    the SDK's internal transform layer to call model_dump(by_alias=None), which
+    raises a TypeError in Pydantic 2.8+. Converting to plain dicts first avoids
+    this entirely.
+    """
+    result = []
+    for block in content:
+        if block.type == "text":
+            result.append({"type": "text", "text": block.text})
+        elif block.type == "tool_use":
+            result.append({
+                "type": "tool_use",
+                "id": block.id,
+                "name": block.name,
+                "input": block.input,
+            })
+        else:
+            # Fallback: explicit by_alias=False (a bool) is valid in all Pydantic 2.x
+            result.append(block.model_dump(by_alias=False))
+    return result
+
+
 def _run_search(
     query: str,
     doc_id_filter: Optional[str],
@@ -146,7 +171,7 @@ def chat(
                     })
 
             # Feed tool results back into the conversation
-            api_messages.append({"role": "assistant", "content": response.content})
+            api_messages.append({"role": "assistant", "content": _content_to_dicts(response.content)})
             api_messages.append({"role": "user", "content": tool_results})
 
         else:
