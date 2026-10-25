@@ -13,6 +13,7 @@ Interactive demos showcasing AI agent capabilities for [miagentuca.es](https://m
 | **ADE Pipeline** | [ade-pipeline.miagentuca.es](https://ade-pipeline.miagentuca.es) | Loan application document pipeline (LandingAI ADE) |
 | **ADE RAG** | [ade-rag.miagentuca.es](https://ade-rag.miagentuca.es) | Document Q&A with retrieval augmented generation |
 | **ADE Chat** | [ade-chat.miagentuca.es](https://ade-chat.miagentuca.es) | Multi-document research chatbot with session memory |
+| **Voice** | [voice.miagentuca.es](https://voice.miagentuca.es) | Token service for the Vocal Bridge voice agent on miagentuca.es |
 
 ## Architecture
 
@@ -173,6 +174,34 @@ Ships with 8 medical research papers pre-indexed → Upload additional PDFs → 
 - `GET  https://ade-chat.miagentuca.es/documents` (list library)
 - `POST https://ade-chat.miagentuca.es/chat` (multi-turn chat)
 
+---
+
+### Voice - Vocal Bridge Token Service
+The voice agent on miagentuca.es runs on [Vocal Bridge](https://vocalbridgeai.com). The browser must never see the Vocal Bridge API key, so this tiny service exchanges it for a short-lived session token that the page uses to join the voice room.
+
+**Flow:** browser → `POST /token` → this service calls Vocal Bridge `/api/v1/token` with the secret key → returns only `{connection_url, token, session_name, agent_mode}`
+
+**Guards:**
+- CORS limited to `ALLOWED_ORIGINS`
+- 5 tokens per IP per hour (each token starts a billable voice session)
+- Clean `502` if Vocal Bridge fails; the key and token are never logged
+
+**Agent source of truth:** `directives/voice_demo.md` (prompt) and `agents/voice-demo/actions.json` (Client Actions) are pasted into the Vocal Bridge dashboard; the service does not read them at runtime.
+
+**Environment:** `VOCAL_BRIDGE_API_KEY`, `VOCAL_BRIDGE_AGENT_ID_VOICE`, `ALLOWED_ORIGINS` (see `demo-voice/.env.example`). Port 8010.
+
+**Run locally:**
+```bash
+cd demo-voice
+pip install -r requirements.txt
+cp .env.example .env   # fill in real values
+uvicorn orchestration.token_endpoint:app --port 8010
+```
+
+**APIs:**
+- `POST https://voice.miagentuca.es/token` (mint a session token)
+- `GET  https://voice.miagentuca.es/health`
+
 ## Tech Stack
 
 - **Backend:** FastAPI + Python 3.12
@@ -218,6 +247,11 @@ miagentuca-demos/
 │   ├── execution/
 │   ├── orchestration/
 │   └── Dockerfile
+├── demo-voice/               # Vocal Bridge token service (voice agent)
+│   ├── agents/voice-demo/     # Client Actions schema (pasted into Vocal Bridge)
+│   ├── directives/            # Agent prompt (pasted into Vocal Bridge)
+│   ├── orchestration/         # FastAPI token endpoint
+│   └── Dockerfile
 └── demo-ade-chat/            # Multi-document research chatbot (Anthropic tool_use + session memory)
     ├── directives/
     ├── execution/
@@ -238,6 +272,7 @@ Each demo has interactive API documentation:
 - https://ade-pipeline.miagentuca.es/docs
 - https://ade-rag.miagentuca.es/docs
 - https://ade-chat.miagentuca.es/docs
+- https://voice.miagentuca.es/docs
 
 ## Security
 
