@@ -1,0 +1,34 @@
+[
+  {
+    "name": "show_proposal",
+    "description": "Show the proposal card on the page. Payload: {sector: string, problem: string, title: string (max 8 words), steps: [string, string, string] (each max 12 words, concrete), hoursSavedPerWeek: integer (orientativo), confidence: 'baja' | 'media' | 'alta'}.",
+    "direction": "agent_to_app"
+  },
+  {
+    "name": "update_proposal",
+    "description": "Change part of the proposal card already shown. Payload: any subset of the show_proposal fields; only the fields sent are replaced.",
+    "direction": "agent_to_app"
+  },
+  {
+    "name": "highlight_step",
+    "description": "Highlight one step of the proposal while explaining it. Payload: {index: 0 | 1 | 2}.",
+    "direction": "agent_to_app"
+  },
+  {
+    "name": "clear_ui",
+    "description": "Remove the proposal card and reset the page to its initial state. Payload: {}.",
+    "direction": "agent_to_app"
+  },
+  {
+    "name": "sector_selected",
+    "description": "The user picked a business sector on the page. Payload: {sector: string}. Acknowledge the sector and ask what problem takes up their time.",
+    "direction": "app_to_agent",
+    "behavior": "respond"
+  },
+  {
+    "name": "ui_sync",
+    "description": "Full current state of the page; treat the latest one as ground truth. Payload: {status: 'idle' | 'listening' | 'proposal' | 'done', sector: string | null, problem: string | null, title: string | null, steps: string[], hoursSavedPerWeek: integer | null, confidence: 'baja' | 'media' | 'alta' | null, highlightedStep: 0 | 1 | 2 | null}.",
+    "direction": "app_to_agent",
+    "behavior": "notify"
+  }
+]
