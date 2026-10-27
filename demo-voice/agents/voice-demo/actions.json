@@ -1,7 +1,7 @@
 [
   {
     "name": "show_proposal",
-    "description": "Show the proposal card on the page. Payload: {sector: string, problem: string, title: string (max 8 words), steps: [string, string, string] (each max 12 words, concrete), hoursSavedPerWeek: integer (orientativo), confidence: 'baja' | 'media' | 'alta'}.",
+    "description": "Show the proposal card. Payload: {sector, problem, title (max 8 words), steps [3, each max 12 words], hoursSavedPerWeek (integer), confidence ('baja'|'media'|'alta')}.",
     "direction": "agent_to_app"
   },
   {
@@ -27,7 +27,7 @@
   },
   {
     "name": "ui_sync",
-    "description": "Full current state of the page; treat the latest one as ground truth. Payload: {status: 'idle' | 'listening' | 'proposal' | 'done', sector: string | null, problem: string | null, title: string | null, steps: string[], hoursSavedPerWeek: integer | null, confidence: 'baja' | 'media' | 'alta' | null, highlightedStep: 0 | 1 | 2 | null}.",
+    "description": "Full current page state; treat the latest one as ground truth. Payload: {status ('idle'|'listening'|'proposal'|'done'), sector, problem, title, steps, hoursSavedPerWeek, confidence, highlightedStep}.",
     "direction": "app_to_agent",
     "behavior": "notify"
   }
