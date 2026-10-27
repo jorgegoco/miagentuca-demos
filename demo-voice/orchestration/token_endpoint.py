@@ -22,7 +22,7 @@ load_dotenv()
 # Configuration
 VOCAL_BRIDGE_URL = "https://vocalbridgeai.com/api/v1/token"
 VOCAL_BRIDGE_API_KEY = os.getenv("VOCAL_BRIDGE_API_KEY")
-VOCAL_BRIDGE_AGENT_ID = os.getenv("VOCAL_BRIDGE_AGENT_ID_VOICE")
+DEFAULT_AGENT = "voice-demo"
 ALLOWED_ORIGINS = [
     o.strip()
     for o in os.getenv("ALLOWED_ORIGINS", "https://miagentuca.es,http://localhost:5173").split(",")
@@ -32,6 +32,35 @@ PARTICIPANT_NAME = "Visitante web"
 
 logger = logging.getLogger("demo-voice")
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+
+
+def load_agents() -> dict[str, str]:
+    """Parse VOCAL_BRIDGE_AGENTS ("name:agent_id,...") into {name: agent_id}.
+
+    VOCAL_BRIDGE_AGENT_ID_VOICE stays as the fallback for "voice-demo".
+    """
+    agents = {}
+    for pair in os.getenv("VOCAL_BRIDGE_AGENTS", "").split(","):
+        if not pair.strip():
+            continue
+        name, _, agent_id = pair.partition(":")
+        name, agent_id = name.strip(), agent_id.strip()
+        if not name or not agent_id:
+            logger.warning("Ignoring malformed VOCAL_BRIDGE_AGENTS entry (expected name:agent_id)")
+            continue
+        agents[name] = agent_id
+
+    legacy_id = os.getenv("VOCAL_BRIDGE_AGENT_ID_VOICE", "").strip()
+    if DEFAULT_AGENT not in agents and legacy_id:
+        agents[DEFAULT_AGENT] = legacy_id
+    return agents
+
+
+AGENTS = load_agents()
+if not AGENTS:
+    logger.error("No Vocal Bridge agent configured: set VOCAL_BRIDGE_AGENTS or VOCAL_BRIDGE_AGENT_ID_VOICE")
+    raise SystemExit(1)
+logger.info("Configured agents: %s", ", ".join(AGENTS))
 
 # Initialize FastAPI
 app = FastAPI(
@@ -72,12 +101,33 @@ async def health_check():
     return {"status": "ok"}
 
 
+@app.get("/agents")
+async def list_agents():
+    """List configured agent names (never their ids) so a page can check its agent exists."""
+    return {"agents": list(AGENTS)}
+
+
 @app.post("/token")
-@limiter.limit(TOKEN_RATE_LIMIT)
-async def mint_token(request: Request):
+@limiter.shared_limit(TOKEN_RATE_LIMIT, scope="token")
+async def mint_default_token(request: Request):
+    """Alias of /token/voice-demo, kept so the live landing page works unchanged."""
+    return await mint_session(DEFAULT_AGENT)
+
+
+@app.post("/token/{agent}")
+@limiter.shared_limit(TOKEN_RATE_LIMIT, scope="token")
+async def mint_agent_token(request: Request, agent: str):
+    """Mint a session token for the named agent (shares the /token rate limit)."""
+    if agent not in AGENTS:
+        raise HTTPException(status_code=404, detail="Unknown agent")
+    return await mint_session(agent)
+
+
+async def mint_session(agent: str):
     """Ask Vocal Bridge for a session token and return only what the browser needs."""
-    if not VOCAL_BRIDGE_API_KEY or not VOCAL_BRIDGE_AGENT_ID:
-        logger.error("Vocal Bridge credentials not configured")
+    agent_id = AGENTS.get(agent)
+    if not VOCAL_BRIDGE_API_KEY or not agent_id:
+        logger.error("Vocal Bridge credentials not configured for agent %s", agent)
         raise HTTPException(status_code=502, detail="Voice service unavailable")
 
     try:
@@ -86,7 +136,7 @@ async def mint_token(request: Request):
                 VOCAL_BRIDGE_URL,
                 headers={
                     "X-API-Key": VOCAL_BRIDGE_API_KEY,
-                    "X-Agent-Id": VOCAL_BRIDGE_AGENT_ID,
+                    "X-Agent-Id": agent_id,
                     "Content-Type": "application/json",
                 },
                 json={"participant_name": PARTICIPANT_NAME},
@@ -101,9 +151,9 @@ async def mint_token(request: Request):
         }
     except httpx.HTTPStatusError as e:
         # Log only the status code: the response body could echo credentials
-        logger.error("Vocal Bridge returned HTTP %s", e.response.status_code)
+        logger.error("Vocal Bridge returned HTTP %s for agent %s", e.response.status_code, agent)
     except httpx.HTTPError as e:
-        logger.error("Vocal Bridge request failed: %s", type(e).__name__)
+        logger.error("Vocal Bridge request failed for agent %s: %s", agent, type(e).__name__)
     except (ValueError, KeyError) as e:
-        logger.error("Unexpected Vocal Bridge response: %s", type(e).__name__)
+        logger.error("Unexpected Vocal Bridge response for agent %s: %s", agent, type(e).__name__)
     raise HTTPException(status_code=502, detail="Voice service unavailable")
