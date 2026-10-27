@@ -188,7 +188,9 @@ The voice agent on miagentuca.es runs on [Vocal Bridge](https://vocalbridgeai.co
 
 **Agent source of truth:** `directives/voice_demo.md` (prompt) and `agents/voice-demo/actions.json` (Client Actions) are pasted into the Vocal Bridge dashboard; the service does not read them at runtime.
 
-**Environment:** `VOCAL_BRIDGE_API_KEY`, `VOCAL_BRIDGE_AGENT_ID_VOICE`, `ALLOWED_ORIGINS` (see `demo-voice/.env.example`). Port 8010.
+**Environment:** `VOCAL_BRIDGE_API_KEY`, `VOCAL_BRIDGE_AGENTS`, `ALLOWED_ORIGINS` (see `demo-voice/.env.example`). Port 8010.
+
+**Agents:** one service serves several Vocal Bridge agents. `VOCAL_BRIDGE_AGENTS` lists them as comma-separated `name:agent_id` pairs, e.g. `voice-demo:abc123,shop:def456`. The legacy `VOCAL_BRIDGE_AGENT_ID_VOICE` still works as the fallback for `voice-demo`. The service refuses to start if no agent is configured.
 
 **Run locally:**
 ```bash

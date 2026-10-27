@@ -22,7 +22,7 @@ load_dotenv()
 # Configuration
 VOCAL_BRIDGE_URL = "https://vocalbridgeai.com/api/v1/token"
 VOCAL_BRIDGE_API_KEY = os.getenv("VOCAL_BRIDGE_API_KEY")
-VOCAL_BRIDGE_AGENT_ID = os.getenv("VOCAL_BRIDGE_AGENT_ID_VOICE")
+DEFAULT_AGENT = "voice-demo"
 ALLOWED_ORIGINS = [
     o.strip()
     for o in os.getenv("ALLOWED_ORIGINS", "https://miagentuca.es,http://localhost:5173").split(",")
@@ -32,6 +32,35 @@ PARTICIPANT_NAME = "Visitante web"
 
 logger = logging.getLogger("demo-voice")
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+
+
+def load_agents() -> dict[str, str]:
+    """Parse VOCAL_BRIDGE_AGENTS ("name:agent_id,...") into {name: agent_id}.
+
+    VOCAL_BRIDGE_AGENT_ID_VOICE stays as the fallback for "voice-demo".
+    """
+    agents = {}
+    for pair in os.getenv("VOCAL_BRIDGE_AGENTS", "").split(","):
+        if not pair.strip():
+            continue
+        name, _, agent_id = pair.partition(":")
+        name, agent_id = name.strip(), agent_id.strip()
+        if not name or not agent_id:
+            logger.warning("Ignoring malformed VOCAL_BRIDGE_AGENTS entry (expected name:agent_id)")
+            continue
+        agents[name] = agent_id
+
+    legacy_id = os.getenv("VOCAL_BRIDGE_AGENT_ID_VOICE", "").strip()
+    if DEFAULT_AGENT not in agents and legacy_id:
+        agents[DEFAULT_AGENT] = legacy_id
+    return agents
+
+
+AGENTS = load_agents()
+if not AGENTS:
+    logger.error("No Vocal Bridge agent configured: set VOCAL_BRIDGE_AGENTS or VOCAL_BRIDGE_AGENT_ID_VOICE")
+    raise SystemExit(1)
+logger.info("Configured agents: %s", ", ".join(AGENTS))
 
 # Initialize FastAPI
 app = FastAPI(
@@ -76,7 +105,8 @@ async def health_check():
 @limiter.limit(TOKEN_RATE_LIMIT)
 async def mint_token(request: Request):
     """Ask Vocal Bridge for a session token and return only what the browser needs."""
-    if not VOCAL_BRIDGE_API_KEY or not VOCAL_BRIDGE_AGENT_ID:
+    agent_id = AGENTS.get(DEFAULT_AGENT)
+    if not VOCAL_BRIDGE_API_KEY or not agent_id:
         logger.error("Vocal Bridge credentials not configured")
         raise HTTPException(status_code=502, detail="Voice service unavailable")
 
@@ -86,7 +116,7 @@ async def mint_token(request: Request):
                 VOCAL_BRIDGE_URL,
                 headers={
                     "X-API-Key": VOCAL_BRIDGE_API_KEY,
-                    "X-Agent-Id": VOCAL_BRIDGE_AGENT_ID,
+                    "X-Agent-Id": agent_id,
                     "Content-Type": "application/json",
                 },
                 json={"participant_name": PARTICIPANT_NAME},
