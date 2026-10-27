@@ -102,12 +102,26 @@ async def health_check():
 
 
 @app.post("/token")
-@limiter.limit(TOKEN_RATE_LIMIT)
-async def mint_token(request: Request):
+@limiter.shared_limit(TOKEN_RATE_LIMIT, scope="token")
+async def mint_default_token(request: Request):
+    """Alias of /token/voice-demo, kept so the live landing page works unchanged."""
+    return await mint_session(DEFAULT_AGENT)
+
+
+@app.post("/token/{agent}")
+@limiter.shared_limit(TOKEN_RATE_LIMIT, scope="token")
+async def mint_agent_token(request: Request, agent: str):
+    """Mint a session token for the named agent (shares the /token rate limit)."""
+    if agent not in AGENTS:
+        raise HTTPException(status_code=404, detail="Unknown agent")
+    return await mint_session(agent)
+
+
+async def mint_session(agent: str):
     """Ask Vocal Bridge for a session token and return only what the browser needs."""
-    agent_id = AGENTS.get(DEFAULT_AGENT)
+    agent_id = AGENTS.get(agent)
     if not VOCAL_BRIDGE_API_KEY or not agent_id:
-        logger.error("Vocal Bridge credentials not configured")
+        logger.error("Vocal Bridge credentials not configured for agent %s", agent)
         raise HTTPException(status_code=502, detail="Voice service unavailable")
 
     try:
@@ -131,9 +145,9 @@ async def mint_token(request: Request):
         }
     except httpx.HTTPStatusError as e:
         # Log only the status code: the response body could echo credentials
-        logger.error("Vocal Bridge returned HTTP %s", e.response.status_code)
+        logger.error("Vocal Bridge returned HTTP %s for agent %s", e.response.status_code, agent)
     except httpx.HTTPError as e:
-        logger.error("Vocal Bridge request failed: %s", type(e).__name__)
+        logger.error("Vocal Bridge request failed for agent %s: %s", agent, type(e).__name__)
     except (ValueError, KeyError) as e:
-        logger.error("Unexpected Vocal Bridge response: %s", type(e).__name__)
+        logger.error("Unexpected Vocal Bridge response for agent %s: %s", agent, type(e).__name__)
     raise HTTPException(status_code=502, detail="Voice service unavailable")

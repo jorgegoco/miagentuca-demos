@@ -179,11 +179,11 @@ Ships with 8 medical research papers pre-indexed → Upload additional PDFs → 
 ### Voice - Vocal Bridge Token Service
 The voice agent on miagentuca.es runs on [Vocal Bridge](https://vocalbridgeai.com). The browser must never see the Vocal Bridge API key, so this tiny service exchanges it for a short-lived session token that the page uses to join the voice room.
 
-**Flow:** browser → `POST /token` → this service calls Vocal Bridge `/api/v1/token` with the secret key → returns only `{connection_url, token, session_name, agent_mode}`
+**Flow:** browser → `POST /token/{agent}` → this service calls Vocal Bridge `/api/v1/token` with the secret key → returns only `{connection_url, token, session_name, agent_mode}`
 
 **Guards:**
 - CORS limited to `ALLOWED_ORIGINS`
-- 5 tokens per IP per hour (each token starts a billable voice session)
+- 5 tokens per IP per hour across all agents and routes (each token starts a billable voice session)
 - Clean `502` if Vocal Bridge fails; the key and token are never logged
 
 **Agent source of truth:** `directives/voice_demo.md` (prompt) and `agents/voice-demo/actions.json` (Client Actions) are pasted into the Vocal Bridge dashboard; the service does not read them at runtime.
@@ -201,7 +201,8 @@ uvicorn orchestration.token_endpoint:app --port 8010
 ```
 
 **APIs:**
-- `POST https://voice.miagentuca.es/token` (mint a session token)
+- `POST https://voice.miagentuca.es/token/{agent}` (mint a session token for that agent; `404` if unknown)
+- `POST https://voice.miagentuca.es/token` (alias of `/token/voice-demo`, used by the landing page)
 - `GET  https://voice.miagentuca.es/health`
 
 ## Tech Stack
