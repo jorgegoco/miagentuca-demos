@@ -101,6 +101,12 @@ async def health_check():
     return {"status": "ok"}
 
 
+@app.get("/agents")
+async def list_agents():
+    """List configured agent names (never their ids) so a page can check its agent exists."""
+    return {"agents": list(AGENTS)}
+
+
 @app.post("/token")
 @limiter.shared_limit(TOKEN_RATE_LIMIT, scope="token")
 async def mint_default_token(request: Request):

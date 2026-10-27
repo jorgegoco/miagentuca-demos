@@ -203,6 +203,7 @@ uvicorn orchestration.token_endpoint:app --port 8010
 **APIs:**
 - `POST https://voice.miagentuca.es/token/{agent}` (mint a session token for that agent; `404` if unknown)
 - `POST https://voice.miagentuca.es/token` (alias of `/token/voice-demo`, used by the landing page)
+- `GET  https://voice.miagentuca.es/agents` (configured agent names, never ids)
 - `GET  https://voice.miagentuca.es/health`
 
 ## Tech Stack
